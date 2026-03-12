@@ -236,3 +236,181 @@ body,
   text-transform: uppercase;
 }
 
+.location-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.location-input-shell {
+  flex: 1;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  background: radial-gradient(circle at top left, #020617 0, #020617 55%, #020617 100%);
+  padding: 0.25rem 0.75rem;
+}
+
+.location-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #e5e7eb;
+  font-size: 0.9rem;
+}
+
+.location-input::placeholder {
+  color: #4b5563;
+}
+
+.btn-location {
+  border-radius: 999px;
+  border: none;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+  color: #0b1120;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.status-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  margin-bottom: 0.25rem;
+}
+
+.status-pill {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  border: 1px solid rgba(55, 65, 81, 0.9);
+  color: #9ca3af;
+  background: rgba(15, 23, 42, 0.85);
+}
+
+.status-pill-offline {
+  border-color: rgba(248, 113, 113, 0.9);
+  color: #fecaca;
+}
+
+.error-banner {
+  margin-top: 0.35rem;
+  margin-bottom: 0.25rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.75rem;
+  font-size: 0.75rem;
+  background: rgba(127, 29, 29, 0.8);
+  border: 1px solid rgba(248, 113, 113, 0.9);
+  color: #fee2e2;
+}
+
+.weather-today {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.weather-today-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.weather-location {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.weather-description {
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.weather-temp-block {
+  text-align: right;
+}
+
+.weather-temp {
+  font-size: 2.4rem;
+  font-weight: 700;
+}
+
+.weather-feels {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.weather-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.metric {
+  min-width: 0;
+}
+
+.metric-label {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.metric-value {
+  font-size: 0.9rem;
+}
+
+.metric-updated {
+  font-size: 0.75rem;
+}
+
+.forecast-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.forecast-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(55, 65, 81, 0.9);
+  background: rgba(15, 23, 42, 0.75);
+}
+
+.forecast-date {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.forecast-main {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.forecast-description {
+  font-size: 0.8rem;
+}
+
+.forecast-temps {
+  display: flex;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.forecast-temp-max {
+  font-weight: 600;
+}
+
+.forecast-temp-min {
+  color: #9ca3af;
+}
+
