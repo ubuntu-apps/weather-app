@@ -132,6 +132,16 @@ function convertTemp(value: number, unit: TemperatureUnit): number {
   return unit === 'C' ? value : value * (9 / 5) + 32
 }
 
+function formatTimeLabel(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 const infoText = `Cross-device weather app.
 
 This app reuses the same shell patterns as the mortgage calculator:
@@ -157,6 +167,14 @@ function App() {
   const [hourly, setHourly] = useState<HourlyEntry[]>(() => {
     const snapshot = loadSnapshot()
     return snapshot?.hourly ?? []
+  })
+  const [sunrise, setSunrise] = useState<string | null>(() => {
+    const snapshot = loadSnapshot()
+    return snapshot?.sunrise ?? null
+  })
+  const [sunset, setSunset] = useState<string | null>(() => {
+    const snapshot = loadSnapshot()
+    return snapshot?.sunset ?? null
   })
   const [dataSource, setDataSource] = useState<DataSource | null>(null)
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
@@ -238,7 +256,7 @@ function App() {
           'hourly',
           'temperature_2m,apparent_temperature,precipitation_probability,weather_code',
         )
-        forecastUrl.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code')
+        forecastUrl.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset')
         forecastUrl.searchParams.set('forecast_days', '5')
         forecastUrl.searchParams.set('timezone', 'auto')
 
@@ -274,6 +292,8 @@ function App() {
         const mins: number[] = Array.isArray(daily.temperature_2m_min) ? daily.temperature_2m_min : []
         const maxes: number[] = Array.isArray(daily.temperature_2m_max) ? daily.temperature_2m_max : []
         const codes: number[] = Array.isArray(daily.weather_code) ? daily.weather_code : []
+        const sunrises: string[] = Array.isArray(daily.sunrise) ? daily.sunrise : []
+        const sunsets: string[] = Array.isArray(daily.sunset) ? daily.sunset : []
 
         const forecastItems: ForecastItem[] = dates.map((date, index) => ({
           date,
@@ -318,6 +338,9 @@ function App() {
           })
           .filter((entry): entry is HourlyEntry => entry !== null)
 
+        const todaySunrise = sunrises[0] ?? null
+        const todaySunset = sunsets[0] ?? null
+
         const snapshot: WeatherSnapshot = {
           location,
           latitude,
@@ -325,6 +348,8 @@ function App() {
           current: now,
           forecast: forecastItems,
           hourly: hourlyItems,
+          sunrise: todaySunrise ?? undefined,
+          sunset: todaySunset ?? undefined,
           updatedAt: Date.now(),
         }
 
@@ -333,6 +358,8 @@ function App() {
           setCurrent(now)
           setForecast(forecastItems)
           setHourly(hourlyItems)
+          setSunrise(todaySunrise)
+          setSunset(todaySunset)
           setStatus('success')
           setDataSource('live')
           saveSnapshot(snapshot)
@@ -378,7 +405,7 @@ function App() {
         'hourly',
         'temperature_2m,apparent_temperature,precipitation_probability,weather_code',
       )
-      forecastUrl.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code')
+      forecastUrl.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset')
       forecastUrl.searchParams.set('forecast_days', '5')
       forecastUrl.searchParams.set('timezone', 'auto')
 
@@ -413,6 +440,8 @@ function App() {
       const mins: number[] = Array.isArray(daily.temperature_2m_min) ? daily.temperature_2m_min : []
       const maxes: number[] = Array.isArray(daily.temperature_2m_max) ? daily.temperature_2m_max : []
       const codes: number[] = Array.isArray(daily.weather_code) ? daily.weather_code : []
+      const sunrises: string[] = Array.isArray(daily.sunrise) ? daily.sunrise : []
+      const sunsets: string[] = Array.isArray(daily.sunset) ? daily.sunset : []
 
       const forecastItems: ForecastItem[] = dates.map((date, index) => ({
         date,
@@ -456,6 +485,9 @@ function App() {
         })
         .filter((entry): entry is HourlyEntry => entry !== null)
 
+      const todaySunrise = sunrises[0] ?? null
+      const todaySunset = sunsets[0] ?? null
+
       const snapshot: WeatherSnapshot = {
         location,
         latitude: candidate.latitude,
@@ -463,12 +495,16 @@ function App() {
         current: now,
         forecast: forecastItems,
         hourly: hourlyItems,
+        sunrise: todaySunrise ?? undefined,
+        sunset: todaySunset ?? undefined,
         updatedAt: Date.now(),
       }
 
       setCurrent(now)
       setForecast(forecastItems)
       setHourly(hourlyItems)
+      setSunrise(todaySunrise)
+      setSunset(todaySunset)
       setStatus('success')
       setDataSource('live')
       saveSnapshot(snapshot)
@@ -642,6 +678,14 @@ function App() {
                       <div className="metric-value">{Math.round(current.humidity)}%</div>
                     </div>
                     <div className="metric">
+                      <div className="metric-label">Sunrise</div>
+                      <div className="metric-value metric-updated">{formatTimeLabel(sunrise)}</div>
+                    </div>
+                    <div className="metric">
+                      <div className="metric-label">Sunset</div>
+                      <div className="metric-value metric-updated">{formatTimeLabel(sunset)}</div>
+                    </div>
+                    <div className="metric">
                       <div className="metric-label">Updated</div>
                       <div className="metric-value metric-updated">{updatedLabel}</div>
                     </div>
@@ -657,13 +701,18 @@ function App() {
                             hour: 'numeric',
                             minute: '2-digit',
                           })
+                          const hour = dt.getHours()
+                          const isNight = hour < 6 || hour >= 20
+                          const baseGlyph = glyphForWeatherCode(entry.code ?? undefined) ?? '·'
+                          const glyph =
+                            isNight && entry.code === 0
+                              ? '🌙'
+                              : baseGlyph
                           return (
                             <div key={entry.time} className="hourly-item">
                               <div className="hourly-time">{hourLabel}</div>
                               <div className="hourly-main">
-                                <span className="hourly-glyph">
-                                  {glyphForWeatherCode(entry.code ?? undefined) ?? '·'}
-                                </span>
+                                <span className="hourly-glyph">{glyph}</span>
                                 <span className="hourly-temp">
                                   {Math.round(convertTemp(entry.temperature, unit))}
                                   {unitSuffix}

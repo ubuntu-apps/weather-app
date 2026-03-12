@@ -42,6 +42,8 @@ export interface WeatherSnapshot {
   forecast: ForecastItem[]
   updatedAt: number
   hourly?: HourlyEntry[]
+  sunrise?: string
+  sunset?: string
 }
 
 export interface GeoCandidate {
