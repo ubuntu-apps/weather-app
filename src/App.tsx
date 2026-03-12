@@ -14,6 +14,7 @@ type DataSource = 'live' | 'cache'
 
 interface CurrentWeather {
   city: string
+  admin1?: string
   country?: string
   temperature: number
   feelsLike: number
@@ -190,11 +191,24 @@ function App() {
         setStatus('loading')
         setError(null)
 
-        const encodedLocation = encodeURIComponent(location.trim())
+        const rawInput = location.trim()
+        const parts = rawInput.split(',').map((part) => part.trim()).filter((part) => part.length > 0)
 
-        const geoRes = await fetch(
-          `https://geocoding-api.open-meteo.com/v1/search?name=${encodedLocation}&count=1&language=en&format=json`,
-        )
+        const namePart = parts[0] ?? rawInput
+        const maybeCountryPart = parts.length > 1 ? parts[parts.length - 1] : ''
+        const twoLetterCountry =
+          maybeCountryPart.length === 2 ? maybeCountryPart.toUpperCase() : undefined
+
+        const params = new URLSearchParams()
+        params.set('name', namePart)
+        params.set('count', '5')
+        params.set('language', 'en')
+        params.set('format', 'json')
+        if (twoLetterCountry) {
+          params.set('country_code', twoLetterCountry)
+        }
+
+        const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params.toString()}`)
 
         if (!geoRes.ok) {
           throw new Error('Unable to look up this city.')
@@ -209,7 +223,8 @@ function App() {
 
         const latitude = typeof first.latitude === 'number' ? first.latitude : Number(first.latitude)
         const longitude = typeof first.longitude === 'number' ? first.longitude : Number(first.longitude)
-        const resolvedName: string = first.name ?? location
+        const resolvedName: string = first.name ?? namePart
+        const admin1: string | undefined = first.admin1 ?? undefined
         const country: string | undefined = first.country ?? undefined
 
         const forecastUrl = new URL('https://api.open-meteo.com/v1/forecast')
@@ -233,6 +248,7 @@ function App() {
 
         const now: CurrentWeather = {
           city: resolvedName,
+          admin1,
           country,
           temperature: typeof currentBlock.temperature_2m === 'number' ? currentBlock.temperature_2m : 0,
           feelsLike:
@@ -368,8 +384,7 @@ function App() {
                   <div className="weather-today-main">
                     <div>
                       <div className="weather-location">
-                        {current.city}
-                        {current.country ? `, ${current.country}` : ''}
+                        {[current.city, current.admin1, current.country].filter(Boolean).join(', ')}
                       </div>
                       <div className="weather-description">
                         {current.description.charAt(0).toUpperCase() + current.description.slice(1)}
