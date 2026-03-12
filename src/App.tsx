@@ -13,6 +13,8 @@ import type {
   WeatherSnapshot,
 } from './weatherTypes'
 import { LocationInputRow, lookupLocation } from './components/LocationInput'
+import { BottomNav, type BottomNavItem } from './components/BottomNav'
+import { TodayIcon, ForecastIcon, InfoIcon } from './components/icons'
 import { APP_VERSION } from './version'
 import { STORAGE_LOCATION_KEY, STORAGE_SNAPSHOT_KEY, STORAGE_UNIT_KEY } from './weatherConstants'
 
@@ -502,6 +504,24 @@ function App() {
 
   const unitSuffix = unit === 'C' ? '°C' : '°F'
 
+  const navItems: BottomNavItem[] = [
+    {
+      id: 'today',
+      label: 'Today',
+      icon: <TodayIcon />,
+    },
+    {
+      id: 'forecast',
+      label: 'Forecast',
+      icon: <ForecastIcon />,
+    },
+    {
+      id: 'about',
+      label: 'About',
+      icon: <InfoIcon />,
+    },
+  ]
+
   return (
     <div className={shellClassName}>
       <header className="app-header">
@@ -719,57 +739,11 @@ function App() {
         </div>
       </main>
 
-      <nav className="bottom-nav">
-        <div className="bottom-nav-inner">
-          <button
-            type="button"
-            className={`nav-item ${activeTab === 'today' ? 'active' : ''}`}
-            onClick={() => setActiveTab('today')}
-          >
-            <span className="nav-item-icon">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  fill="currentColor"
-                  d="M12 4a1 1 0 0 1 1 1v1.055a4.5 4.5 0 1 1-2 0V5a1 1 0 0 1 1-1Zm0 5.5a2.5 2.5 0 1 0-2.5-2.5A2.503 2.503 0 0 0 12 9.5Zm-7 3a1 1 0 0 1 1-1h12a1 1 0 0 1 .9 1.436l-2.5 5A1 1 0 0 1 15.5 19h-7a1 1 0 0 1-.9-.564l-2.5-5A1 1 0 0 1 5 12.5Z"
-                />
-              </svg>
-            </span>
-            <span className="nav-label">Today</span>
-          </button>
-
-          <button
-            type="button"
-            className={`nav-item ${activeTab === 'forecast' ? 'active' : ''}`}
-            onClick={() => setActiveTab('forecast')}
-          >
-            <span className="nav-item-icon">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  fill="currentColor"
-                  d="M5 6.5A3.5 3.5 0 0 1 8.5 3 3.5 3.5 0 0 1 12 6.5 3.5 3.5 0 0 1 5 6.5Zm9.5-1A3.5 3.5 0 1 1 22 9a3.5 3.5 0 0 1-7 0 3.5 3.5 0 0 1-.5-3.5Zm-8 7A3.5 3.5 0 0 1 10 16a3.5 3.5 0 1 1-3.5-3.5Zm8.5 1a3.5 3.5 0 1 1 0 7H9a3 3 0 0 1 0-6h6.5Z"
-                />
-              </svg>
-            </span>
-            <span className="nav-label">Forecast</span>
-          </button>
-
-          <button
-            type="button"
-            className={`nav-item ${activeTab === 'about' ? 'active' : ''}`}
-            onClick={() => setActiveTab('about')}
-          >
-            <span className="nav-item-icon">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  fill="currentColor"
-                  d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2Zm0 3.25a1.25 1.25 0 1 1-1.25 1.25A1.251 1.251 0 0 1 12 5.25Zm2 12.25h-4a1 1 0 0 1 0-2h1v-4h-.5a1 1 0 0 1 0-2H13a1 1 0 0 1 1 1v5h0a1 1 0 0 1 0 2Z"
-                />
-              </svg>
-            </span>
-            <span className="nav-label">About</span>
-          </button>
-        </div>
-      </nav>
+      <BottomNav
+        items={navItems}
+        activeId={activeTab}
+        onSelect={(id) => setActiveTab(id as ActiveTab)}
+      />
     </div>
   )
 }
