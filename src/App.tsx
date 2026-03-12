@@ -306,10 +306,15 @@ function App() {
         forecastUrl.searchParams.set('forecast_days', '5')
         forecastUrl.searchParams.set('timezone', 'auto')
 
-        const forecastRes = await fetch(forecastUrl.toString())
-
-        if (!forecastRes.ok) {
-          throw new Error('Unable to load weather for this location.')
+        if (isUSZip) {
+          const usOnly = results.filter((item) => {
+            const code = String(item.country_code ?? '').toUpperCase()
+            const countryName = String(item.country ?? '')
+            return code === 'US' || countryName.includes('United States')
+          })
+          if (usOnly.length > 0) {
+            filtered = usOnly
+          }
         }
 
         const forecastJson = (await forecastRes.json()) as any
@@ -357,13 +362,24 @@ function App() {
           updatedAt: Date.now(),
         }
 
+        const first = filtered[0]
+
+        const latitude = typeof first.latitude === 'number' ? first.latitude : Number(first.latitude)
+        const longitude = typeof first.longitude === 'number' ? first.longitude : Number(first.longitude)
+        const resolvedName: string = first.name ?? namePart
+        const admin1: string | undefined = first.admin1 ?? undefined
+        const country: string | undefined = first.country ?? undefined
+
         if (!cancelled) {
-          setCurrent(now)
-          setForecast(forecastItems)
-          setStatus('success')
-          setDataSource('live')
-          saveSnapshot(snapshot)
-          setError(null)
+          setCandidates([])
+          await loadWeatherForCoords({
+            id: String(first.id ?? `${latitude},${longitude}`),
+            name: resolvedName,
+            admin1,
+            country,
+            latitude,
+            longitude,
+          })
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Something went wrong while loading weather data.'

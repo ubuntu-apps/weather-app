@@ -442,6 +442,49 @@ body,
   font-size: 0.75rem;
 }
 
+.location-choices {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(55, 65, 81, 0.9);
+  background: rgba(15, 23, 42, 0.75);
+}
+
+.location-choices-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  color: #d1d5db;
+}
+
+.location-choices-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.location-choice {
+  width: 100%;
+  text-align: left;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(55, 65, 81, 0.9);
+  padding: 0.35rem 0.55rem;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.location-choice-name {
+  display: block;
+  font-weight: 600;
+}
+
+.location-choice-meta {
+  display: block;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
 .forecast-list {
   display: flex;
   flex-direction: column;
