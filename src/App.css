@@ -1,0 +1,238 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100dvh;
+  min-height: 100vh;
+  height: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+  padding-top: env(safe-area-inset-top, 0);
+  padding-left: env(safe-area-inset-left, 0);
+  padding-right: env(safe-area-inset-right, 0);
+  background: linear-gradient(to bottom, #020617, #020617 40%, #020617cc 100%);
+  color: #e5e7eb;
+}
+
+.app-shell--android {
+}
+
+.app-shell--ios {
+  background: radial-gradient(circle at top, #020617 0, #020617 50%, #020617ee 100%);
+}
+
+.app-shell--desktop {
+  max-width: 640px;
+}
+
+.app-header {
+  padding: 1.25rem 1.5rem 0.5rem;
+}
+
+.app-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.app-title {
+  margin: 0;
+  font-size: 1.4rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #e5e7eb;
+}
+
+.app-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.app-version {
+  font-size: 0.7rem;
+  color: #4b5563;
+}
+
+.app-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  padding: 0.75rem 1.5rem 1rem;
+  padding-bottom: calc(
+    var(--nav-height, 4rem) + env(safe-area-inset-bottom, 0px)
+  );
+}
+
+.card {
+  background: radial-gradient(circle at top left, #111827 0, #020617 60%);
+  border-radius: 1rem;
+  padding: 1.25rem 1.25rem 1rem;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.tabs-body {
+  margin-top: 0.85rem;
+  padding: 0.8rem 0.1rem 0.2rem;
+  font-size: 0.8rem;
+  color: #d1d5db;
+}
+
+.info-text {
+  white-space: pre-line;
+}
+
+.bottom-nav {
+  --nav-height: 4.25rem;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  max-width: 480px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 1.25rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  padding-left: calc(1.25rem + env(safe-area-inset-left, 0px));
+  padding-right: calc(1.25rem + env(safe-area-inset-right, 0px));
+  background: linear-gradient(
+    to top,
+    rgba(15, 23, 42, 0.98),
+    rgba(15, 23, 42, 0.95)
+  );
+  border-top: 1px solid rgba(55, 65, 81, 0.9);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  z-index: 1000;
+  flex-shrink: 0;
+}
+
+.app-shell--android .bottom-nav {
+  background: #020617;
+  border-top: 1px solid rgba(31, 41, 55, 0.9);
+  padding: 0.35rem 1.25rem 0.5rem;
+}
+
+.app-shell--android .bottom-nav-inner {
+  gap: 0.35rem;
+}
+
+.app-shell--android .nav-item {
+  padding: 0.4rem 0.3rem;
+  font-size: 0.7rem;
+}
+
+.app-shell--android .nav-item-icon {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+
+.app-shell--ios .bottom-nav {
+  background: linear-gradient(
+    to top,
+    rgba(15, 23, 42, 0.98),
+    rgba(15, 23, 42, 0.9)
+  );
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  padding: 0.6rem 1.25rem calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+
+.app-shell--ios .nav-item {
+  padding: 0.45rem 0.35rem;
+}
+
+.app-shell--desktop .bottom-nav {
+  padding: 0.6rem 1.75rem 1rem;
+}
+
+.app-shell--desktop .nav-item {
+  padding: 0.4rem 0.35rem;
+}
+
+.bottom-nav-inner {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.35rem 0.25rem;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #9ca3af;
+  font-size: 0.65rem;
+}
+
+.nav-item-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.05rem;
+}
+
+.nav-item-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.nav-item.active {
+  color: #e5e7eb;
+}
+
+.nav-item.active .nav-item-icon {
+  background: radial-gradient(
+    circle at top left,
+    #38bdf8 0,
+    #0ea5e9 40%,
+    #0369a1 100%
+  );
+  color: #0b1120;
+}
+
+.nav-item:not(.active) .nav-item-icon {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(55, 65, 81, 0.9);
+}
+
+.nav-label {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
