@@ -232,12 +232,17 @@ function App() {
         setError(null)
 
         const rawInput = location.trim()
+        const isUSZip = /^\d{5}$/.test(rawInput)
         const parts = rawInput.split(',').map((part) => part.trim()).filter((part) => part.length > 0)
 
         const namePart = parts[0] ?? rawInput
         const maybeCountryPart = parts.length > 1 ? parts[parts.length - 1] : ''
         const twoLetterCountry =
-          maybeCountryPart.length === 2 ? maybeCountryPart.toUpperCase() : undefined
+          isUSZip
+            ? 'US'
+            : maybeCountryPart.length === 2
+              ? maybeCountryPart.toUpperCase()
+              : undefined
 
         const params = new URLSearchParams()
         params.set('name', namePart)
