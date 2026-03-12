@@ -11,6 +11,7 @@ type NavigatorLike = Navigator & { vendor?: string }
 type WindowLike = Window & { opera?: string }
 
 type DataSource = 'live' | 'cache'
+type TemperatureUnit = 'C' | 'F'
 
 interface CurrentWeather {
   city: string
@@ -20,7 +21,7 @@ interface CurrentWeather {
   feelsLike: number
   humidity: number
   description: string
-  icon: string | null
+  code?: number
   updatedAt: number
 }
 
@@ -29,7 +30,7 @@ interface ForecastItem {
   minTemp: number
   maxTemp: number
   description: string
-  icon: string | null
+  code?: number
 }
 
 interface WeatherSnapshot {
@@ -43,6 +44,7 @@ interface WeatherSnapshot {
 
 const STORAGE_LOCATION_KEY = 'weatherApp:location'
 const STORAGE_SNAPSHOT_KEY = 'weatherApp:lastSnapshot'
+const STORAGE_UNIT_KEY = 'weatherApp:unit'
 
 function describeWeatherCode(code: unknown): string {
   const n = typeof code === 'number' ? code : Number(code)
@@ -64,6 +66,28 @@ function describeWeatherCode(code: unknown): string {
   if (n === 96 || n === 99) return 'Thunderstorm with hail'
 
   return 'Unknown conditions'
+}
+
+function glyphForWeatherCode(code: unknown): string | null {
+  const n = typeof code === 'number' ? code : Number(code)
+  if (Number.isNaN(n)) return null
+
+  if (n === 0) return '☀️'
+  if (n === 1 || n === 2) return '🌤️'
+  if (n === 3) return '☁️'
+  if (n === 45 || n === 48) return '🌫️'
+  if (n === 51 || n === 53 || n === 55) return '🌦️'
+  if (n === 56 || n === 57) return '🌧️'
+  if (n === 61 || n === 63 || n === 65) return '🌧️'
+  if (n === 66 || n === 67) return '🌧️'
+  if (n === 71 || n === 73 || n === 75) return '❄️'
+  if (n === 77) return '❄️'
+  if (n === 80 || n === 81 || n === 82) return '🌦️'
+  if (n === 85 || n === 86) return '🌨️'
+  if (n === 95) return '⛈️'
+  if (n === 96 || n === 99) return '⛈️'
+
+  return null
 }
 
 function detectPlatform(): Platform {
@@ -118,6 +142,21 @@ function saveSnapshot(snapshot: WeatherSnapshot) {
   }
 }
 
+function loadStoredUnit(): TemperatureUnit {
+  try {
+    const raw = localStorage.getItem(STORAGE_UNIT_KEY)
+    if (raw === 'C' || raw === 'F') return raw
+  } catch {
+    // ignore
+  }
+  return 'C'
+}
+
+function convertTemp(value: number, unit: TemperatureUnit): number {
+  if (!Number.isFinite(value)) return 0
+  return unit === 'C' ? value : value * (9 / 5) + 32
+}
+
 const infoText = `Cross-device weather app.
 
 This app reuses the same shell patterns as the mortgage calculator:
@@ -144,6 +183,7 @@ function App() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
   const [offline, setOffline] = useState<boolean>(typeof navigator !== 'undefined' ? !navigator.onLine : false)
+  const [unit, setUnit] = useState<TemperatureUnit>(() => loadStoredUnit())
 
   useEffect(() => {
     function handleOnline() {
@@ -259,7 +299,7 @@ function App() {
                 : 0,
           humidity: typeof humidityValue === 'number' ? humidityValue : 0,
           description: describeWeatherCode(currentBlock.weather_code),
-          icon: null,
+          code: typeof currentBlock.weather_code === 'number' ? currentBlock.weather_code : undefined,
           updatedAt: Date.now(),
         }
 
@@ -274,7 +314,7 @@ function App() {
           minTemp: typeof mins[index] === 'number' ? mins[index] : 0,
           maxTemp: typeof maxes[index] === 'number' ? maxes[index] : 0,
           description: describeWeatherCode(codes[index]),
-          icon: null,
+          code: typeof codes[index] === 'number' ? codes[index] : undefined,
         }))
 
         const snapshot: WeatherSnapshot = {
@@ -317,6 +357,16 @@ function App() {
     saveLocation(trimmed)
   }
 
+  function handleChangeUnit(next: TemperatureUnit) {
+    if (next === unit) return
+    setUnit(next)
+    try {
+      localStorage.setItem(STORAGE_UNIT_KEY, next)
+    } catch {
+      // ignore
+    }
+  }
+
   const shellClassName =
     platform === 'android'
       ? 'app-shell app-shell--android'
@@ -328,6 +378,8 @@ function App() {
     current?.updatedAt != null
       ? new Date(current.updatedAt).toLocaleString()
       : 'No data yet'
+
+  const unitSuffix = unit === 'C' ? '°C' : '°F'
 
   return (
     <div className={shellClassName}>
@@ -361,6 +413,23 @@ function App() {
             </button>
           </div>
 
+          <div className="unit-toggle-row">
+            <button
+              type="button"
+              className={`unit-pill ${unit === 'C' ? 'unit-pill-active' : ''}`}
+              onClick={() => handleChangeUnit('C')}
+            >
+              °C
+            </button>
+            <button
+              type="button"
+              className={`unit-pill ${unit === 'F' ? 'unit-pill-active' : ''}`}
+              onClick={() => handleChangeUnit('F')}
+            >
+              °F
+            </button>
+          </div>
+
           <div className="status-row">
             {offline && <span className="status-pill status-pill-offline">Offline</span>}
             {status === 'loading' && <span className="status-pill">Loading…</span>}
@@ -387,12 +456,23 @@ function App() {
                         {[current.city, current.admin1, current.country].filter(Boolean).join(', ')}
                       </div>
                       <div className="weather-description">
-                        {current.description.charAt(0).toUpperCase() + current.description.slice(1)}
+                        {glyphForWeatherCode(current.code ?? undefined) && (
+                          <span className="weather-glyph">{glyphForWeatherCode(current.code ?? undefined)}</span>
+                        )}
+                        <span>
+                          {current.description.charAt(0).toUpperCase() + current.description.slice(1)}
+                        </span>
                       </div>
                     </div>
                     <div className="weather-temp-block">
-                      <div className="weather-temp">{Math.round(current.temperature)}°</div>
-                      <div className="weather-feels">Feels like {Math.round(current.feelsLike)}°</div>
+                      <div className="weather-temp">
+                        {Math.round(convertTemp(current.temperature, unit))}
+                        {unitSuffix}
+                      </div>
+                      <div className="weather-feels">
+                        Feels like {Math.round(convertTemp(current.feelsLike, unit))}
+                        {unitSuffix}
+                      </div>
                     </div>
                   </div>
 
@@ -430,11 +510,24 @@ function App() {
                       </div>
                       <div className="forecast-main">
                         <div className="forecast-description">
-                          {item.description.charAt(0).toUpperCase() + item.description.slice(1)}
+                          {glyphForWeatherCode(item.code ?? undefined) && (
+                            <span className="forecast-glyph">
+                              {glyphForWeatherCode(item.code ?? undefined)}
+                            </span>
+                          )}
+                          <span>
+                            {item.description.charAt(0).toUpperCase() + item.description.slice(1)}
+                          </span>
                         </div>
                         <div className="forecast-temps">
-                          <span className="forecast-temp-max">{Math.round(item.maxTemp)}°</span>
-                          <span className="forecast-temp-min">{Math.round(item.minTemp)}°</span>
+                          <span className="forecast-temp-max">
+                            {Math.round(convertTemp(item.maxTemp, unit))}
+                            {unitSuffix}
+                          </span>
+                          <span className="forecast-temp-min">
+                            {Math.round(convertTemp(item.minTemp, unit))}
+                            {unitSuffix}
+                          </span>
                         </div>
                       </div>
                     </div>

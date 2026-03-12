@@ -283,6 +283,29 @@ body,
   margin-bottom: 0.25rem;
 }
 
+.unit-toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.25rem;
+}
+
+.unit-pill {
+  border-radius: 999px;
+  border: 1px solid rgba(55, 65, 81, 0.9);
+  padding: 0.15rem 0.55rem;
+  font-size: 0.75rem;
+  background: rgba(15, 23, 42, 0.8);
+  color: #9ca3af;
+  cursor: pointer;
+}
+
+.unit-pill-active {
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+  color: #0b1120;
+  border-color: transparent;
+}
+
 .status-pill {
   padding: 0.15rem 0.6rem;
   border-radius: 999px;
@@ -329,6 +352,13 @@ body,
 .weather-description {
   font-size: 0.85rem;
   color: #9ca3af;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.weather-glyph {
+  font-size: 1.1rem;
 }
 
 .weather-temp-block {
@@ -398,6 +428,13 @@ body,
 
 .forecast-description {
   font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.forecast-glyph {
+  font-size: 1rem;
 }
 
 .forecast-temps {
