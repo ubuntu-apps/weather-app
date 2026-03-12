@@ -205,9 +205,22 @@ function App() {
 
         const rawInput = location.trim()
         const isUSZip = /^\d{5}$/.test(rawInput)
-        const parts = rawInput.split(',').map((part) => part.trim()).filter((part) => part.length > 0)
 
-        const namePart = parts[0] ?? rawInput
+        let effectiveInput = rawInput
+        if (!isUSZip && !rawInput.includes(',')) {
+          const tokens = rawInput.split(/\s+/).filter((token) => token.length > 0)
+          if (tokens.length >= 2) {
+            const lastToken = tokens[tokens.length - 1].toUpperCase()
+            if (lastToken.length === 2 && US_STATE_MAP[lastToken]) {
+              const cityPart = tokens.slice(0, -1).join(' ')
+              effectiveInput = `${cityPart}, ${lastToken}`
+            }
+          }
+        }
+
+        const parts = effectiveInput.split(',').map((part) => part.trim()).filter((part) => part.length > 0)
+
+        const namePart = parts[0] ?? effectiveInput
         let twoLetterCountry: string | undefined
         let adminHint = ''
 
@@ -301,20 +314,17 @@ function App() {
         const forecastUrl = new URL('https://api.open-meteo.com/v1/forecast')
         forecastUrl.searchParams.set('latitude', String(latitude))
         forecastUrl.searchParams.set('longitude', String(longitude))
-        forecastUrl.searchParams.set('current', 'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code')
+        forecastUrl.searchParams.set(
+          'current',
+          'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code',
+        )
         forecastUrl.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code')
         forecastUrl.searchParams.set('forecast_days', '5')
         forecastUrl.searchParams.set('timezone', 'auto')
 
-        if (isUSZip) {
-          const usOnly = results.filter((item) => {
-            const code = String(item.country_code ?? '').toUpperCase()
-            const countryName = String(item.country ?? '')
-            return code === 'US' || countryName.includes('United States')
-          })
-          if (usOnly.length > 0) {
-            filtered = usOnly
-          }
+        const forecastRes = await fetch(forecastUrl.toString())
+        if (!forecastRes.ok) {
+          throw new Error('Unable to load weather for this location.')
         }
 
         const forecastJson = (await forecastRes.json()) as any
@@ -362,24 +372,14 @@ function App() {
           updatedAt: Date.now(),
         }
 
-        const first = filtered[0]
-
-        const latitude = typeof first.latitude === 'number' ? first.latitude : Number(first.latitude)
-        const longitude = typeof first.longitude === 'number' ? first.longitude : Number(first.longitude)
-        const resolvedName: string = first.name ?? namePart
-        const admin1: string | undefined = first.admin1 ?? undefined
-        const country: string | undefined = first.country ?? undefined
-
         if (!cancelled) {
           setCandidates([])
-          await loadWeatherForCoords({
-            id: String(first.id ?? `${latitude},${longitude}`),
-            name: resolvedName,
-            admin1,
-            country,
-            latitude,
-            longitude,
-          })
+          setCurrent(now)
+          setForecast(forecastItems)
+          setStatus('success')
+          setDataSource('live')
+          saveSnapshot(snapshot)
+          setError(null)
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Something went wrong while loading weather data.'
