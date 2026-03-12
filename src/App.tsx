@@ -12,8 +12,9 @@ import type {
   TemperatureUnit,
   WeatherSnapshot,
 } from './weatherTypes'
+import { LocationInputRow, lookupLocation } from './components/LocationInput'
 import { APP_VERSION } from './version'
-import { STORAGE_LOCATION_KEY, STORAGE_SNAPSHOT_KEY, STORAGE_UNIT_KEY, US_STATE_MAP } from './weatherConstants'
+import { STORAGE_LOCATION_KEY, STORAGE_SNAPSHOT_KEY, STORAGE_UNIT_KEY } from './weatherConstants'
 
 type NavigatorLike = Navigator & { vendor?: string }
 type WindowLike = Window & { opera?: string }
@@ -208,113 +209,21 @@ function App() {
         setStatus('loading')
         setError(null)
 
-        const rawInput = location.trim()
-        const isUSZip = /^\d{5}$/.test(rawInput)
+        const { primary, candidates: geoCandidates } = await lookupLocation(location)
 
-        let effectiveInput = rawInput
-        if (!isUSZip && !rawInput.includes(',')) {
-          const tokens = rawInput.split(/\s+/).filter((token) => token.length > 0)
-          if (tokens.length >= 2) {
-            const lastToken = tokens[tokens.length - 1].toUpperCase()
-            if (lastToken.length === 2 && US_STATE_MAP[lastToken]) {
-              const cityPart = tokens.slice(0, -1).join(' ')
-              effectiveInput = `${cityPart}, ${lastToken}`
-            }
-          }
-        }
-
-        const parts = effectiveInput.split(',').map((part) => part.trim()).filter((part) => part.length > 0)
-
-        const namePart = parts[0] ?? effectiveInput
-        let twoLetterCountry: string | undefined
-        let adminHint = ''
-
-        if (isUSZip) {
-          twoLetterCountry = 'US'
-        } else if (parts.length > 1) {
-          const lastPart = parts[parts.length - 1] ?? ''
-          const lastUpper = lastPart.toUpperCase()
-          if (lastPart.length === 2 && US_STATE_MAP[lastUpper]) {
-            twoLetterCountry = 'US'
-            adminHint = US_STATE_MAP[lastUpper].toLowerCase()
-          } else if (lastPart.length === 2) {
-            twoLetterCountry = lastUpper
-          }
-          if (!adminHint && parts[1]) {
-            adminHint = parts[1].toLowerCase()
-          }
-        }
-
-        const params = new URLSearchParams()
-        params.set('name', namePart)
-        params.set('count', '5')
-        params.set('language', 'en')
-        params.set('format', 'json')
-        if (twoLetterCountry) {
-          params.set('country_code', twoLetterCountry)
-        }
-
-        const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params.toString()}`)
-
-        if (!geoRes.ok) {
-          throw new Error('Unable to look up this city.')
-        }
-
-        const geoJson = (await geoRes.json()) as any
-        const results: any[] = Array.isArray(geoJson.results) ? geoJson.results : []
-
-        if (results.length === 0) {
-          throw new Error('City not found. Try a different name.')
-        }
-
-        let filtered = results
-
-        if (isUSZip) {
-          const usOnly = results.filter((item) => {
-            const code = String(item.country_code ?? '').toUpperCase()
-            const countryName = String(item.country ?? '')
-            return code === 'US' || countryName.includes('United States')
-          })
-          if (usOnly.length > 0) {
-            filtered = usOnly
-          }
-        }
-
-        if (adminHint) {
-          const adminLower = adminHint.toLowerCase()
-          const byAdmin = filtered.filter((item) =>
-            String(item.admin1 ?? '').toLowerCase().includes(adminLower),
-          )
-          if (byAdmin.length > 0) {
-            filtered = byAdmin
-          }
-        }
-
-        const showList = !isUSZip && !adminHint && filtered.length > 1
-        if (showList) {
-          setCandidates(
-            filtered.map((item) => ({
-              id: String(item.id ?? `${item.latitude},${item.longitude}`),
-              name: item.name ?? namePart,
-              admin1: item.admin1 ?? undefined,
-              country: item.country ?? undefined,
-              latitude: typeof item.latitude === 'number' ? item.latitude : Number(item.latitude),
-              longitude: typeof item.longitude === 'number' ? item.longitude : Number(item.longitude),
-            })),
-          )
+        if (geoCandidates.length > 0 && !primary) {
+          setCandidates(geoCandidates)
           setStatus('idle')
           setDataSource(null)
           setError('Multiple locations found. Please choose one.')
           return
         }
 
-        const first = filtered[0]
+        if (!primary) {
+          throw new Error('City not found. Try a different name.')
+        }
 
-        const latitude = typeof first.latitude === 'number' ? first.latitude : Number(first.latitude)
-        const longitude = typeof first.longitude === 'number' ? first.longitude : Number(first.longitude)
-        const resolvedName: string = first.name ?? namePart
-        const admin1: string | undefined = first.admin1 ?? undefined
-        const country: string | undefined = first.country ?? undefined
+        const { latitude, longitude, name: resolvedName, admin1, country } = primary
 
         const forecastUrl = new URL('https://api.open-meteo.com/v1/forecast')
         forecastUrl.searchParams.set('latitude', String(latitude))
@@ -611,19 +520,13 @@ function App() {
             </h2>
           </div>
 
-          <div className="location-row">
-            <div className="location-input-shell">
-              <input
-                className="location-input"
-                value={inputLocation}
-                onChange={(event) => setInputLocation(event.target.value)}
-                placeholder="Enter city (e.g. Zagreb)"
-              />
-            </div>
-            <button type="button" className="btn-location" onClick={handleApplyLocation}>
-              Use city
-            </button>
-          </div>
+          <LocationInputRow
+            value={inputLocation}
+            placeholder="Enter city, state, or ZIP"
+            buttonLabel="Use city"
+            onChange={setInputLocation}
+            onApply={handleApplyLocation}
+          />
 
           <div className="unit-toggle-row">
             <button
