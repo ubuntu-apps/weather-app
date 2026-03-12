@@ -18,6 +18,14 @@ export interface CurrentWeather {
   updatedAt: number
 }
 
+export interface HourlyEntry {
+  time: string
+  temperature: number
+  apparentTemperature: number
+  precipitationProbability?: number
+  code?: number
+}
+
 export interface ForecastItem {
   date: string
   minTemp: number
@@ -33,6 +41,7 @@ export interface WeatherSnapshot {
   current: CurrentWeather | null
   forecast: ForecastItem[]
   updatedAt: number
+  hourly?: HourlyEntry[]
 }
 
 export interface GeoCandidate {
