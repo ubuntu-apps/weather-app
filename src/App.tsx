@@ -1,110 +1,21 @@
 import './App.css'
 
 import { useEffect, useState } from 'react'
+import type {
+  ActiveTab,
+  CurrentWeather,
+  DataSource,
+  ForecastItem,
+  GeoCandidate,
+  Platform,
+  TemperatureUnit,
+  WeatherSnapshot,
+} from './weatherTypes'
 import { APP_VERSION } from './version'
-
-type Platform = 'android' | 'ios' | 'desktop'
-
-type ActiveTab = 'today' | 'forecast' | 'about'
+import { STORAGE_LOCATION_KEY, STORAGE_SNAPSHOT_KEY, STORAGE_UNIT_KEY, US_STATE_MAP } from './weatherConstants'
 
 type NavigatorLike = Navigator & { vendor?: string }
 type WindowLike = Window & { opera?: string }
-
-type DataSource = 'live' | 'cache'
-
-interface CurrentWeather {
-  city: string
-  admin1?: string
-  country?: string
-  temperature: number
-  feelsLike: number
-  humidity: number
-  description: string
-  icon: string | null
-  updatedAt: number
-}
-
-interface ForecastItem {
-  date: string
-  minTemp: number
-  maxTemp: number
-  description: string
-  icon: string | null
-}
-
-interface WeatherSnapshot {
-  location: string
-  latitude: number
-  longitude: number
-  current: CurrentWeather | null
-  forecast: ForecastItem[]
-  updatedAt: number
-}
-
-interface GeoCandidate {
-  id: string
-  name: string
-  admin1?: string
-  country?: string
-  latitude: number
-  longitude: number
-}
-
-const STORAGE_LOCATION_KEY = 'weatherApp:location'
-const STORAGE_SNAPSHOT_KEY = 'weatherApp:lastSnapshot'
-
-const US_STATE_MAP: Record<string, string> = {
-  AL: 'Alabama',
-  AK: 'Alaska',
-  AZ: 'Arizona',
-  AR: 'Arkansas',
-  CA: 'California',
-  CO: 'Colorado',
-  CT: 'Connecticut',
-  DE: 'Delaware',
-  FL: 'Florida',
-  GA: 'Georgia',
-  HI: 'Hawaii',
-  ID: 'Idaho',
-  IL: 'Illinois',
-  IN: 'Indiana',
-  IA: 'Iowa',
-  KS: 'Kansas',
-  KY: 'Kentucky',
-  LA: 'Louisiana',
-  ME: 'Maine',
-  MD: 'Maryland',
-  MA: 'Massachusetts',
-  MI: 'Michigan',
-  MN: 'Minnesota',
-  MS: 'Mississippi',
-  MO: 'Missouri',
-  MT: 'Montana',
-  NE: 'Nebraska',
-  NV: 'Nevada',
-  NH: 'New Hampshire',
-  NJ: 'New Jersey',
-  NM: 'New Mexico',
-  NY: 'New York',
-  NC: 'North Carolina',
-  ND: 'North Dakota',
-  OH: 'Ohio',
-  OK: 'Oklahoma',
-  OR: 'Oregon',
-  PA: 'Pennsylvania',
-  RI: 'Rhode Island',
-  SC: 'South Carolina',
-  SD: 'South Dakota',
-  TN: 'Tennessee',
-  TX: 'Texas',
-  UT: 'Utah',
-  VT: 'Vermont',
-  VA: 'Virginia',
-  WA: 'Washington',
-  WV: 'West Virginia',
-  WI: 'Wisconsin',
-  WY: 'Wyoming',
-}
 
 function describeWeatherCode(code: unknown): string {
   const n = typeof code === 'number' ? code : Number(code)
@@ -126,6 +37,28 @@ function describeWeatherCode(code: unknown): string {
   if (n === 96 || n === 99) return 'Thunderstorm with hail'
 
   return 'Unknown conditions'
+}
+
+function glyphForWeatherCode(code: unknown): string | null {
+  const n = typeof code === 'number' ? code : Number(code)
+  if (Number.isNaN(n)) return null
+
+  if (n === 0) return '☀️'
+  if (n === 1 || n === 2) return '🌤️'
+  if (n === 3) return '☁️'
+  if (n === 45 || n === 48) return '🌫️'
+  if (n === 51 || n === 53 || n === 55) return '🌦️'
+  if (n === 56 || n === 57) return '🌧️'
+  if (n === 61 || n === 63 || n === 65) return '🌧️'
+  if (n === 66 || n === 67) return '🌧️'
+  if (n === 71 || n === 73 || n === 75) return '❄️'
+  if (n === 77) return '❄️'
+  if (n === 80 || n === 81 || n === 82) return '🌦️'
+  if (n === 85 || n === 86) return '🌨️'
+  if (n === 95) return '⛈️'
+  if (n === 96 || n === 99) return '⛈️'
+
+  return null
 }
 
 function detectPlatform(): Platform {
@@ -180,6 +113,21 @@ function saveSnapshot(snapshot: WeatherSnapshot) {
   }
 }
 
+function loadStoredUnit(): TemperatureUnit {
+  try {
+    const raw = localStorage.getItem(STORAGE_UNIT_KEY)
+    if (raw === 'C' || raw === 'F') return raw
+  } catch {
+    // ignore
+  }
+  return 'C'
+}
+
+function convertTemp(value: number, unit: TemperatureUnit): number {
+  if (!Number.isFinite(value)) return 0
+  return unit === 'C' ? value : value * (9 / 5) + 32
+}
+
 const infoText = `Cross-device weather app.
 
 This app reuses the same shell patterns as the mortgage calculator:
@@ -206,78 +154,8 @@ function App() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
   const [offline, setOffline] = useState<boolean>(typeof navigator !== 'undefined' ? !navigator.onLine : false)
+  const [unit, setUnit] = useState<TemperatureUnit>(() => loadStoredUnit())
   const [candidates, setCandidates] = useState<GeoCandidate[]>([])
-
-  async function loadWeatherForCoords(candidate: GeoCandidate) {
-    const forecastUrl = new URL('https://api.open-meteo.com/v1/forecast')
-    forecastUrl.searchParams.set('latitude', String(candidate.latitude))
-    forecastUrl.searchParams.set('longitude', String(candidate.longitude))
-    forecastUrl.searchParams.set(
-      'current',
-      'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code',
-    )
-    forecastUrl.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code')
-    forecastUrl.searchParams.set('forecast_days', '5')
-    forecastUrl.searchParams.set('timezone', 'auto')
-
-    const forecastRes = await fetch(forecastUrl.toString())
-
-    if (!forecastRes.ok) {
-      throw new Error('Unable to load weather for this location.')
-    }
-
-    const forecastJson = (await forecastRes.json()) as any
-
-    const currentBlock = forecastJson.current ?? {}
-    const humidityValue = forecastJson.current?.relative_humidity_2m
-
-    const now: CurrentWeather = {
-      city: candidate.name,
-      admin1: candidate.admin1,
-      country: candidate.country,
-      temperature: typeof currentBlock.temperature_2m === 'number' ? currentBlock.temperature_2m : 0,
-      feelsLike:
-        typeof currentBlock.apparent_temperature === 'number'
-          ? currentBlock.apparent_temperature
-          : typeof currentBlock.temperature_2m === 'number'
-            ? currentBlock.temperature_2m
-            : 0,
-      humidity: typeof humidityValue === 'number' ? humidityValue : 0,
-      description: describeWeatherCode(currentBlock.weather_code),
-      icon: null,
-      updatedAt: Date.now(),
-    }
-
-    const daily = forecastJson.daily ?? {}
-    const dates: string[] = Array.isArray(daily.time) ? daily.time : []
-    const mins: number[] = Array.isArray(daily.temperature_2m_min) ? daily.temperature_2m_min : []
-    const maxes: number[] = Array.isArray(daily.temperature_2m_max) ? daily.temperature_2m_max : []
-    const codes: number[] = Array.isArray(daily.weather_code) ? daily.weather_code : []
-
-    const forecastItems: ForecastItem[] = dates.map((date, index) => ({
-      date,
-      minTemp: typeof mins[index] === 'number' ? mins[index] : 0,
-      maxTemp: typeof maxes[index] === 'number' ? maxes[index] : 0,
-      description: describeWeatherCode(codes[index]),
-      icon: null,
-    }))
-
-    const snapshot: WeatherSnapshot = {
-      location,
-      latitude: candidate.latitude,
-      longitude: candidate.longitude,
-      current: now,
-      forecast: forecastItems,
-      updatedAt: Date.now(),
-    }
-
-    setCurrent(now)
-    setForecast(forecastItems)
-    setStatus('success')
-    setDataSource('live')
-    saveSnapshot(snapshot)
-    setError(null)
-  }
 
   useEffect(() => {
     function handleOnline() {
@@ -330,27 +208,22 @@ function App() {
         const parts = rawInput.split(',').map((part) => part.trim()).filter((part) => part.length > 0)
 
         const namePart = parts[0] ?? rawInput
-
         let twoLetterCountry: string | undefined
         let adminHint = ''
 
         if (isUSZip) {
           twoLetterCountry = 'US'
         } else if (parts.length > 1) {
-          const lastPartRaw = parts[parts.length - 1]
-          const last = lastPartRaw.toUpperCase()
-          if (last.length === 2 && US_STATE_MAP[last]) {
+          const lastPart = parts[parts.length - 1] ?? ''
+          const lastUpper = lastPart.toUpperCase()
+          if (lastPart.length === 2 && US_STATE_MAP[lastUpper]) {
             twoLetterCountry = 'US'
-            adminHint = US_STATE_MAP[last].toLowerCase()
-          } else if (last.length === 2) {
-            twoLetterCountry = last
+            adminHint = US_STATE_MAP[lastUpper].toLowerCase()
+          } else if (lastPart.length === 2) {
+            twoLetterCountry = lastUpper
           }
-        }
-
-        if (!adminHint && parts.length > 1 && !isUSZip) {
-          const middle = parts[1]
-          if (middle) {
-            adminHint = middle.toLowerCase()
+          if (!adminHint && parts[1]) {
+            adminHint = parts[1].toLowerCase()
           }
         }
 
@@ -391,35 +264,102 @@ function App() {
 
         if (adminHint) {
           const adminLower = adminHint.toLowerCase()
-          const byAdmin = results.filter((item) =>
-            String(item.admin1 ?? '')
-              .toLowerCase()
-              .includes(adminLower),
+          const byAdmin = filtered.filter((item) =>
+            String(item.admin1 ?? '').toLowerCase().includes(adminLower),
           )
           if (byAdmin.length > 0) {
             filtered = byAdmin
           }
         }
 
-        const shouldOfferChoices = !isUSZip && !adminHint
-
-        if (filtered.length > 1 && shouldOfferChoices) {
-          if (!cancelled) {
-            setCandidates(
-              filtered.map((item) => ({
-                id: String(item.id ?? `${item.latitude},${item.longitude}`),
-                name: item.name ?? namePart,
-                admin1: item.admin1 ?? undefined,
-                country: item.country ?? undefined,
-                latitude: typeof item.latitude === 'number' ? item.latitude : Number(item.latitude),
-                longitude: typeof item.longitude === 'number' ? item.longitude : Number(item.longitude),
-              })),
-            )
-            setStatus('idle')
-            setDataSource(null)
-            setError('Multiple locations found. Please choose one.')
-          }
+        const showList = !isUSZip && !adminHint && filtered.length > 1
+        if (showList) {
+          setCandidates(
+            filtered.map((item) => ({
+              id: String(item.id ?? `${item.latitude},${item.longitude}`),
+              name: item.name ?? namePart,
+              admin1: item.admin1 ?? undefined,
+              country: item.country ?? undefined,
+              latitude: typeof item.latitude === 'number' ? item.latitude : Number(item.latitude),
+              longitude: typeof item.longitude === 'number' ? item.longitude : Number(item.longitude),
+            })),
+          )
+          setStatus('idle')
+          setDataSource(null)
+          setError('Multiple locations found. Please choose one.')
           return
+        }
+
+        const first = filtered[0]
+
+        const latitude = typeof first.latitude === 'number' ? first.latitude : Number(first.latitude)
+        const longitude = typeof first.longitude === 'number' ? first.longitude : Number(first.longitude)
+        const resolvedName: string = first.name ?? namePart
+        const admin1: string | undefined = first.admin1 ?? undefined
+        const country: string | undefined = first.country ?? undefined
+
+        const forecastUrl = new URL('https://api.open-meteo.com/v1/forecast')
+        forecastUrl.searchParams.set('latitude', String(latitude))
+        forecastUrl.searchParams.set('longitude', String(longitude))
+        forecastUrl.searchParams.set('current', 'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code')
+        forecastUrl.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code')
+        forecastUrl.searchParams.set('forecast_days', '5')
+        forecastUrl.searchParams.set('timezone', 'auto')
+
+        if (isUSZip) {
+          const usOnly = results.filter((item) => {
+            const code = String(item.country_code ?? '').toUpperCase()
+            const countryName = String(item.country ?? '')
+            return code === 'US' || countryName.includes('United States')
+          })
+          if (usOnly.length > 0) {
+            filtered = usOnly
+          }
+        }
+
+        const forecastJson = (await forecastRes.json()) as any
+
+        const currentBlock = forecastJson.current ?? {}
+        const humidityValue = forecastJson.current?.relative_humidity_2m
+
+        const now: CurrentWeather = {
+          city: resolvedName,
+          admin1,
+          country,
+          temperature: typeof currentBlock.temperature_2m === 'number' ? currentBlock.temperature_2m : 0,
+          feelsLike:
+            typeof currentBlock.apparent_temperature === 'number'
+              ? currentBlock.apparent_temperature
+              : typeof currentBlock.temperature_2m === 'number'
+                ? currentBlock.temperature_2m
+                : 0,
+          humidity: typeof humidityValue === 'number' ? humidityValue : 0,
+          description: describeWeatherCode(currentBlock.weather_code),
+          code: typeof currentBlock.weather_code === 'number' ? currentBlock.weather_code : undefined,
+          updatedAt: Date.now(),
+        }
+
+        const daily = forecastJson.daily ?? {}
+        const dates: string[] = Array.isArray(daily.time) ? daily.time : []
+        const mins: number[] = Array.isArray(daily.temperature_2m_min) ? daily.temperature_2m_min : []
+        const maxes: number[] = Array.isArray(daily.temperature_2m_max) ? daily.temperature_2m_max : []
+        const codes: number[] = Array.isArray(daily.weather_code) ? daily.weather_code : []
+
+        const forecastItems: ForecastItem[] = dates.map((date, index) => ({
+          date,
+          minTemp: typeof mins[index] === 'number' ? mins[index] : 0,
+          maxTemp: typeof maxes[index] === 'number' ? maxes[index] : 0,
+          description: describeWeatherCode(codes[index]),
+          code: typeof codes[index] === 'number' ? codes[index] : undefined,
+        }))
+
+        const snapshot: WeatherSnapshot = {
+          location,
+          latitude,
+          longitude,
+          current: now,
+          forecast: forecastItems,
+          updatedAt: Date.now(),
         }
 
         const first = filtered[0]
@@ -469,11 +409,87 @@ function App() {
       setStatus('loading')
       setError(null)
       setCandidates([])
-      await loadWeatherForCoords(candidate)
+
+      const forecastUrl = new URL('https://api.open-meteo.com/v1/forecast')
+      forecastUrl.searchParams.set('latitude', String(candidate.latitude))
+      forecastUrl.searchParams.set('longitude', String(candidate.longitude))
+      forecastUrl.searchParams.set(
+        'current',
+        'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code',
+      )
+      forecastUrl.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code')
+      forecastUrl.searchParams.set('forecast_days', '5')
+      forecastUrl.searchParams.set('timezone', 'auto')
+
+      const forecastRes = await fetch(forecastUrl.toString())
+      if (!forecastRes.ok) {
+        throw new Error('Unable to load weather for this location.')
+      }
+
+      const forecastJson = (await forecastRes.json()) as any
+      const currentBlock = forecastJson.current ?? {}
+      const humidityValue = forecastJson.current?.relative_humidity_2m
+
+      const now: CurrentWeather = {
+        city: candidate.name,
+        admin1: candidate.admin1,
+        country: candidate.country,
+        temperature: typeof currentBlock.temperature_2m === 'number' ? currentBlock.temperature_2m : 0,
+        feelsLike:
+          typeof currentBlock.apparent_temperature === 'number'
+            ? currentBlock.apparent_temperature
+            : typeof currentBlock.temperature_2m === 'number'
+              ? currentBlock.temperature_2m
+              : 0,
+        humidity: typeof humidityValue === 'number' ? humidityValue : 0,
+        description: describeWeatherCode(currentBlock.weather_code),
+        code: typeof currentBlock.weather_code === 'number' ? currentBlock.weather_code : undefined,
+        updatedAt: Date.now(),
+      }
+
+      const daily = forecastJson.daily ?? {}
+      const dates: string[] = Array.isArray(daily.time) ? daily.time : []
+      const mins: number[] = Array.isArray(daily.temperature_2m_min) ? daily.temperature_2m_min : []
+      const maxes: number[] = Array.isArray(daily.temperature_2m_max) ? daily.temperature_2m_max : []
+      const codes: number[] = Array.isArray(daily.weather_code) ? daily.weather_code : []
+
+      const forecastItems: ForecastItem[] = dates.map((date, index) => ({
+        date,
+        minTemp: typeof mins[index] === 'number' ? mins[index] : 0,
+        maxTemp: typeof maxes[index] === 'number' ? maxes[index] : 0,
+        description: describeWeatherCode(codes[index]),
+        code: typeof codes[index] === 'number' ? codes[index] : undefined,
+      }))
+
+      const snapshot: WeatherSnapshot = {
+        location,
+        latitude: candidate.latitude,
+        longitude: candidate.longitude,
+        current: now,
+        forecast: forecastItems,
+        updatedAt: Date.now(),
+      }
+
+      setCurrent(now)
+      setForecast(forecastItems)
+      setStatus('success')
+      setDataSource('live')
+      saveSnapshot(snapshot)
+      setError(null)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong while loading weather data.'
       setStatus('error')
       setError(message)
+    }
+  }
+
+  function handleChangeUnit(next: TemperatureUnit) {
+    if (next === unit) return
+    setUnit(next)
+    try {
+      localStorage.setItem(STORAGE_UNIT_KEY, next)
+    } catch {
+      // ignore
     }
   }
 
@@ -488,6 +504,8 @@ function App() {
     current?.updatedAt != null
       ? new Date(current.updatedAt).toLocaleString()
       : 'No data yet'
+
+  const unitSuffix = unit === 'C' ? '°C' : '°F'
 
   return (
     <div className={shellClassName}>
@@ -518,6 +536,23 @@ function App() {
             </div>
             <button type="button" className="btn-location" onClick={handleApplyLocation}>
               Use city
+            </button>
+          </div>
+
+          <div className="unit-toggle-row">
+            <button
+              type="button"
+              className={`unit-pill ${unit === 'C' ? 'unit-pill-active' : ''}`}
+              onClick={() => handleChangeUnit('C')}
+            >
+              °C
+            </button>
+            <button
+              type="button"
+              className={`unit-pill ${unit === 'F' ? 'unit-pill-active' : ''}`}
+              onClick={() => handleChangeUnit('F')}
+            >
+              °F
             </button>
           </div>
 
@@ -572,12 +607,23 @@ function App() {
                         {[current.city, current.admin1, current.country].filter(Boolean).join(', ')}
                       </div>
                       <div className="weather-description">
-                        {current.description.charAt(0).toUpperCase() + current.description.slice(1)}
+                        {glyphForWeatherCode(current.code ?? undefined) && (
+                          <span className="weather-glyph">{glyphForWeatherCode(current.code ?? undefined)}</span>
+                        )}
+                        <span>
+                          {current.description.charAt(0).toUpperCase() + current.description.slice(1)}
+                        </span>
                       </div>
                     </div>
                     <div className="weather-temp-block">
-                      <div className="weather-temp">{Math.round(current.temperature)}°</div>
-                      <div className="weather-feels">Feels like {Math.round(current.feelsLike)}°</div>
+                      <div className="weather-temp">
+                        {Math.round(convertTemp(current.temperature, unit))}
+                        {unitSuffix}
+                      </div>
+                      <div className="weather-feels">
+                        Feels like {Math.round(convertTemp(current.feelsLike, unit))}
+                        {unitSuffix}
+                      </div>
                     </div>
                   </div>
 
@@ -615,11 +661,24 @@ function App() {
                       </div>
                       <div className="forecast-main">
                         <div className="forecast-description">
-                          {item.description.charAt(0).toUpperCase() + item.description.slice(1)}
+                          {glyphForWeatherCode(item.code ?? undefined) && (
+                            <span className="forecast-glyph">
+                              {glyphForWeatherCode(item.code ?? undefined)}
+                            </span>
+                          )}
+                          <span>
+                            {item.description.charAt(0).toUpperCase() + item.description.slice(1)}
+                          </span>
                         </div>
                         <div className="forecast-temps">
-                          <span className="forecast-temp-max">{Math.round(item.maxTemp)}°</span>
-                          <span className="forecast-temp-min">{Math.round(item.minTemp)}°</span>
+                          <span className="forecast-temp-max">
+                            {Math.round(convertTemp(item.maxTemp, unit))}
+                            {unitSuffix}
+                          </span>
+                          <span className="forecast-temp-min">
+                            {Math.round(convertTemp(item.minTemp, unit))}
+                            {unitSuffix}
+                          </span>
                         </div>
                       </div>
                     </div>
