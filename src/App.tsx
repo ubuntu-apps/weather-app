@@ -33,6 +33,8 @@ interface ForecastItem {
 
 interface WeatherSnapshot {
   location: string
+  latitude: number
+  longitude: number
   current: CurrentWeather | null
   forecast: ForecastItem[]
   updatedAt: number
@@ -40,6 +42,28 @@ interface WeatherSnapshot {
 
 const STORAGE_LOCATION_KEY = 'weatherApp:location'
 const STORAGE_SNAPSHOT_KEY = 'weatherApp:lastSnapshot'
+
+function describeWeatherCode(code: unknown): string {
+  const n = typeof code === 'number' ? code : Number(code)
+
+  if (Number.isNaN(n)) return 'Unknown conditions'
+
+  if (n === 0) return 'Clear sky'
+  if (n === 1 || n === 2 || n === 3) return 'Partly cloudy'
+  if (n === 45 || n === 48) return 'Foggy'
+  if (n === 51 || n === 53 || n === 55) return 'Drizzle'
+  if (n === 56 || n === 57) return 'Freezing drizzle'
+  if (n === 61 || n === 63 || n === 65) return 'Rain'
+  if (n === 66 || n === 67) return 'Freezing rain'
+  if (n === 71 || n === 73 || n === 75) return 'Snow'
+  if (n === 77) return 'Snow grains'
+  if (n === 80 || n === 81 || n === 82) return 'Rain showers'
+  if (n === 85 || n === 86) return 'Snow showers'
+  if (n === 95) return 'Thunderstorm'
+  if (n === 96 || n === 99) return 'Thunderstorm with hail'
+
+  return 'Unknown conditions'
+}
 
 function detectPlatform(): Platform {
   if (typeof navigator === 'undefined') return 'desktop'
@@ -144,14 +168,6 @@ function App() {
     async function fetchWeather() {
       if (!location.trim()) return
 
-      const apiKey = import.meta.env.VITE_OPENWEATHER_API_KEY as string | undefined
-
-      if (!apiKey) {
-        setStatus('error')
-        setError('Missing VITE_OPENWEATHER_API_KEY. Add it to a .env file.')
-        return
-      }
-
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         const snapshot = loadSnapshot()
         if (snapshot && snapshot.location.toLowerCase() === location.toLowerCase()) {
@@ -175,80 +191,80 @@ function App() {
         setError(null)
 
         const encodedLocation = encodeURIComponent(location.trim())
-        const units = 'metric'
 
-        const [currentRes, forecastRes] = await Promise.all([
-          fetch(
-            `https://api.openweathermap.org/data/2.5/weather?q=${encodedLocation}&units=${units}&appid=${apiKey}`,
-          ),
-          fetch(
-            `https://api.openweathermap.org/data/2.5/forecast?q=${encodedLocation}&units=${units}&appid=${apiKey}`,
-          ),
-        ])
+        const geoRes = await fetch(
+          `https://geocoding-api.open-meteo.com/v1/search?name=${encodedLocation}&count=1&language=en&format=json`,
+        )
 
-        if (!currentRes.ok) {
-          throw new Error('Unable to load current weather for this city.')
+        if (!geoRes.ok) {
+          throw new Error('Unable to look up this city.')
         }
+
+        const geoJson = (await geoRes.json()) as any
+        const first = Array.isArray(geoJson.results) && geoJson.results.length > 0 ? geoJson.results[0] : null
+
+        if (!first) {
+          throw new Error('City not found. Try a different name.')
+        }
+
+        const latitude = typeof first.latitude === 'number' ? first.latitude : Number(first.latitude)
+        const longitude = typeof first.longitude === 'number' ? first.longitude : Number(first.longitude)
+        const resolvedName: string = first.name ?? location
+        const country: string | undefined = first.country ?? undefined
+
+        const forecastUrl = new URL('https://api.open-meteo.com/v1/forecast')
+        forecastUrl.searchParams.set('latitude', String(latitude))
+        forecastUrl.searchParams.set('longitude', String(longitude))
+        forecastUrl.searchParams.set('current', 'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code')
+        forecastUrl.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code')
+        forecastUrl.searchParams.set('forecast_days', '5')
+        forecastUrl.searchParams.set('timezone', 'auto')
+
+        const forecastRes = await fetch(forecastUrl.toString())
 
         if (!forecastRes.ok) {
-          throw new Error('Unable to load forecast for this city.')
+          throw new Error('Unable to load weather for this location.')
         }
 
-        const currentJson = (await currentRes.json()) as any
         const forecastJson = (await forecastRes.json()) as any
 
+        const currentBlock = forecastJson.current ?? {}
+        const humidityValue = forecastJson.current?.relative_humidity_2m
+
         const now: CurrentWeather = {
-          city: currentJson.name ?? location,
-          country: currentJson.sys?.country,
-          temperature: currentJson.main?.temp ?? 0,
-          feelsLike: currentJson.main?.feels_like ?? currentJson.main?.temp ?? 0,
-          humidity: currentJson.main?.humidity ?? 0,
-          description: currentJson.weather?.[0]?.description ?? 'Unknown conditions',
-          icon: currentJson.weather?.[0]?.icon ?? null,
+          city: resolvedName,
+          country,
+          temperature: typeof currentBlock.temperature_2m === 'number' ? currentBlock.temperature_2m : 0,
+          feelsLike:
+            typeof currentBlock.apparent_temperature === 'number'
+              ? currentBlock.apparent_temperature
+              : typeof currentBlock.temperature_2m === 'number'
+                ? currentBlock.temperature_2m
+                : 0,
+          humidity: typeof humidityValue === 'number' ? humidityValue : 0,
+          description: describeWeatherCode(currentBlock.weather_code),
+          icon: null,
           updatedAt: Date.now(),
         }
 
-        const byDay = new Map<string, { min: number; max: number; description: string; icon: string | null }>()
+        const daily = forecastJson.daily ?? {}
+        const dates: string[] = Array.isArray(daily.time) ? daily.time : []
+        const mins: number[] = Array.isArray(daily.temperature_2m_min) ? daily.temperature_2m_min : []
+        const maxes: number[] = Array.isArray(daily.temperature_2m_max) ? daily.temperature_2m_max : []
+        const codes: number[] = Array.isArray(daily.weather_code) ? daily.weather_code : []
 
-        const list: any[] = Array.isArray(forecastJson.list) ? forecastJson.list : []
-
-        for (const entry of list) {
-          const dt = typeof entry.dt === 'number' ? entry.dt * 1000 : Date.now()
-          const date = new Date(dt)
-          const key = date.toISOString().slice(0, 10)
-          const tempMin = entry.main?.temp_min ?? entry.main?.temp ?? 0
-          const tempMax = entry.main?.temp_max ?? entry.main?.temp ?? 0
-          const description = entry.weather?.[0]?.description ?? 'Unknown'
-          const icon = entry.weather?.[0]?.icon ?? null
-
-          const existing = byDay.get(key)
-          if (!existing) {
-            byDay.set(key, { min: tempMin, max: tempMax, description, icon })
-          } else {
-            byDay.set(key, {
-              min: Math.min(existing.min, tempMin),
-              max: Math.max(existing.max, tempMax),
-              description: existing.description,
-              icon: existing.icon,
-            })
-          }
-        }
-
-        const todayKey = new Date().toISOString().slice(0, 10)
-
-        const forecastItems: ForecastItem[] = Array.from(byDay.entries())
-          .filter(([key]) => key >= todayKey)
-          .slice(0, 5)
-          .map(([key, value]) => ({
-            date: key,
-            minTemp: value.min,
-            maxTemp: value.max,
-            description: value.description,
-            icon: value.icon,
-          }))
+        const forecastItems: ForecastItem[] = dates.map((date, index) => ({
+          date,
+          minTemp: typeof mins[index] === 'number' ? mins[index] : 0,
+          maxTemp: typeof maxes[index] === 'number' ? maxes[index] : 0,
+          description: describeWeatherCode(codes[index]),
+          icon: null,
+        }))
 
         const snapshot: WeatherSnapshot = {
           location,
+          latitude,
+          longitude,
           current: now,
           forecast: forecastItems,
           updatedAt: Date.now(),
