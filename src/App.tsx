@@ -7,6 +7,7 @@ import type {
   DataSource,
   ForecastItem,
   GeoCandidate,
+  HourlyEntry,
   Platform,
   TemperatureUnit,
   WeatherSnapshot,
@@ -149,6 +150,10 @@ function App() {
   const [forecast, setForecast] = useState<ForecastItem[]>(() => {
     const snapshot = loadSnapshot()
     return snapshot?.forecast ?? []
+  })
+  const [hourly, setHourly] = useState<HourlyEntry[]>(() => {
+    const snapshot = loadSnapshot()
+    return snapshot?.hourly ?? []
   })
   const [dataSource, setDataSource] = useState<DataSource | null>(null)
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
@@ -318,6 +323,10 @@ function App() {
           'current',
           'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code',
         )
+        forecastUrl.searchParams.set(
+          'hourly',
+          'temperature_2m,apparent_temperature,precipitation_probability,weather_code',
+        )
         forecastUrl.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code')
         forecastUrl.searchParams.set('forecast_days', '5')
         forecastUrl.searchParams.set('timezone', 'auto')
@@ -363,12 +372,48 @@ function App() {
           code: typeof codes[index] === 'number' ? codes[index] : undefined,
         }))
 
+        const hourlyBlock = forecastJson.hourly ?? {}
+        const hourlyTimes: string[] = Array.isArray(hourlyBlock.time) ? hourlyBlock.time : []
+        const hourlyTemps: number[] = Array.isArray(hourlyBlock.temperature_2m) ? hourlyBlock.temperature_2m : []
+        const hourlyApparent: number[] = Array.isArray(hourlyBlock.apparent_temperature)
+          ? hourlyBlock.apparent_temperature
+          : []
+        const hourlyPop: number[] = Array.isArray(hourlyBlock.precipitation_probability)
+          ? hourlyBlock.precipitation_probability
+          : []
+        const hourlyCodes: number[] = Array.isArray(hourlyBlock.weather_code) ? hourlyBlock.weather_code : []
+
+        const nowTime = Date.now()
+        const cutoff = nowTime + 24 * 60 * 60 * 1000
+
+        const hourlyItems: HourlyEntry[] = hourlyTimes
+          .map((time, index) => {
+            const ts = Date.parse(time)
+            if (Number.isNaN(ts)) return null
+            if (ts < nowTime || ts > cutoff) return null
+            return {
+              time,
+              temperature: typeof hourlyTemps[index] === 'number' ? hourlyTemps[index] : 0,
+              apparentTemperature:
+                typeof hourlyApparent[index] === 'number'
+                  ? hourlyApparent[index]
+                  : typeof hourlyTemps[index] === 'number'
+                    ? hourlyTemps[index]
+                    : 0,
+              precipitationProbability:
+                typeof hourlyPop[index] === 'number' ? hourlyPop[index] : undefined,
+              code: typeof hourlyCodes[index] === 'number' ? hourlyCodes[index] : undefined,
+            } as HourlyEntry
+          })
+          .filter((entry): entry is HourlyEntry => entry !== null)
+
         const snapshot: WeatherSnapshot = {
           location,
           latitude,
           longitude,
           current: now,
           forecast: forecastItems,
+          hourly: hourlyItems,
           updatedAt: Date.now(),
         }
 
@@ -376,6 +421,7 @@ function App() {
           setCandidates([])
           setCurrent(now)
           setForecast(forecastItems)
+          setHourly(hourlyItems)
           setStatus('success')
           setDataSource('live')
           saveSnapshot(snapshot)
@@ -416,6 +462,10 @@ function App() {
       forecastUrl.searchParams.set(
         'current',
         'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code',
+      )
+      forecastUrl.searchParams.set(
+        'hourly',
+        'temperature_2m,apparent_temperature,precipitation_probability,weather_code',
       )
       forecastUrl.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code')
       forecastUrl.searchParams.set('forecast_days', '5')
@@ -461,17 +511,53 @@ function App() {
         code: typeof codes[index] === 'number' ? codes[index] : undefined,
       }))
 
+      const hourlyBlock = forecastJson.hourly ?? {}
+      const hourlyTimes: string[] = Array.isArray(hourlyBlock.time) ? hourlyBlock.time : []
+      const hourlyTemps: number[] = Array.isArray(hourlyBlock.temperature_2m) ? hourlyBlock.temperature_2m : []
+      const hourlyApparent: number[] = Array.isArray(hourlyBlock.apparent_temperature)
+        ? hourlyBlock.apparent_temperature
+        : []
+      const hourlyPop: number[] = Array.isArray(hourlyBlock.precipitation_probability)
+        ? hourlyBlock.precipitation_probability
+        : []
+      const hourlyCodes: number[] = Array.isArray(hourlyBlock.weather_code) ? hourlyBlock.weather_code : []
+
+      const nowTime = Date.now()
+      const cutoff = nowTime + 24 * 60 * 60 * 1000
+
+      const hourlyItems: HourlyEntry[] = hourlyTimes
+        .map((time, index) => {
+          const ts = Date.parse(time)
+          if (Number.isNaN(ts)) return null
+          if (ts < nowTime || ts > cutoff) return null
+          return {
+            time,
+            temperature: typeof hourlyTemps[index] === 'number' ? hourlyTemps[index] : 0,
+            apparentTemperature:
+              typeof hourlyApparent[index] === 'number'
+                ? hourlyApparent[index]
+                : typeof hourlyTemps[index] === 'number'
+                  ? hourlyTemps[index]
+                  : 0,
+            precipitationProbability: typeof hourlyPop[index] === 'number' ? hourlyPop[index] : undefined,
+            code: typeof hourlyCodes[index] === 'number' ? hourlyCodes[index] : undefined,
+          } as HourlyEntry
+        })
+        .filter((entry): entry is HourlyEntry => entry !== null)
+
       const snapshot: WeatherSnapshot = {
         location,
         latitude: candidate.latitude,
         longitude: candidate.longitude,
         current: now,
         forecast: forecastItems,
+        hourly: hourlyItems,
         updatedAt: Date.now(),
       }
 
       setCurrent(now)
       setForecast(forecastItems)
+      setHourly(hourlyItems)
       setStatus('success')
       setDataSource('live')
       saveSnapshot(snapshot)
@@ -637,6 +723,40 @@ function App() {
                       <div className="metric-value metric-updated">{updatedLabel}</div>
                     </div>
                   </div>
+
+                  {hourly.length > 0 && (
+                    <div className="hourly-section">
+                      <div className="hourly-title">Next 24 hours</div>
+                      <div className="hourly-list">
+                        {hourly.map((entry) => {
+                          const dt = new Date(entry.time)
+                          const hourLabel = dt.toLocaleTimeString(undefined, {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })
+                          return (
+                            <div key={entry.time} className="hourly-item">
+                              <div className="hourly-time">{hourLabel}</div>
+                              <div className="hourly-main">
+                                <span className="hourly-glyph">
+                                  {glyphForWeatherCode(entry.code ?? undefined) ?? '·'}
+                                </span>
+                                <span className="hourly-temp">
+                                  {Math.round(convertTemp(entry.temperature, unit))}
+                                  {unitSuffix}
+                                </span>
+                              </div>
+                              {typeof entry.precipitationProbability === 'number' && (
+                                <div className="hourly-pop">
+                                  {Math.round(entry.precipitationProbability)}%
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p>No weather data yet. Enter a city and we will load it.</p>
