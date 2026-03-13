@@ -1,26 +1,5 @@
 import type { CurrentWeather, ForecastItem, HourlyEntry, WeatherApiLocation, WeatherSnapshot } from './weatherTypes'
-
-function describeWeatherCode(code: unknown): string {
-  const n = typeof code === 'number' ? code : Number(code)
-
-  if (Number.isNaN(n)) return 'Unknown conditions'
-
-  if (n === 0) return 'Clear sky'
-  if (n === 1 || n === 2 || n === 3) return 'Partly cloudy'
-  if (n === 45 || n === 48) return 'Foggy'
-  if (n === 51 || n === 53 || n === 55) return 'Drizzle'
-  if (n === 56 || n === 57) return 'Freezing drizzle'
-  if (n === 61 || n === 63 || n === 65) return 'Rain'
-  if (n === 66 || n === 67) return 'Freezing rain'
-  if (n === 71 || n === 73 || n === 75) return 'Snow'
-  if (n === 77) return 'Snow grains'
-  if (n === 80 || n === 81 || n === 82) return 'Rain showers'
-  if (n === 85 || n === 86) return 'Snow showers'
-  if (n === 95) return 'Thunderstorm'
-  if (n === 96 || n === 99) return 'Thunderstorm with hail'
-
-  return 'Unknown conditions'
-}
+import { describeWeatherCode } from './utils'
 
 export async function fetchWeatherSnapshot(
   locationLabel: string,
@@ -33,14 +12,22 @@ export async function fetchWeatherSnapshot(
   forecastUrl.searchParams.set('longitude', String(longitude))
   forecastUrl.searchParams.set(
     'current',
-    'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code',
+    [
+      'temperature_2m',
+      'apparent_temperature',
+      'relative_humidity_2m',
+      'weather_code',
+      'wind_speed_10m',
+      'surface_pressure',
+    ].join(','),
   )
   forecastUrl.searchParams.set(
     'hourly',
     'temperature_2m,apparent_temperature,precipitation_probability,weather_code',
   )
   forecastUrl.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset')
-  forecastUrl.searchParams.set('forecast_days', '5')
+  // request enough days that, after skipping today, we can show a 15‑day forecast
+  forecastUrl.searchParams.set('forecast_days', '16')
   forecastUrl.searchParams.set('timezone', 'auto')
 
   const forecastRes = await fetch(forecastUrl.toString())
@@ -52,6 +39,8 @@ export async function fetchWeatherSnapshot(
 
   const currentBlock = forecastJson.current ?? {}
   const humidityValue = forecastJson.current?.relative_humidity_2m
+  const windSpeedValue = forecastJson.current?.wind_speed_10m
+  const pressureValue = forecastJson.current?.surface_pressure
 
   const current: CurrentWeather = {
     city: name,
@@ -65,6 +54,8 @@ export async function fetchWeatherSnapshot(
           ? currentBlock.temperature_2m
           : 0,
     humidity: typeof humidityValue === 'number' ? humidityValue : 0,
+    windSpeed: typeof windSpeedValue === 'number' ? windSpeedValue : undefined,
+    pressure: typeof pressureValue === 'number' ? pressureValue : undefined,
     description: describeWeatherCode(currentBlock.weather_code),
     code: typeof currentBlock.weather_code === 'number' ? currentBlock.weather_code : undefined,
     updatedAt: Date.now(),
@@ -78,13 +69,25 @@ export async function fetchWeatherSnapshot(
   const sunrises: string[] = Array.isArray(daily.sunrise) ? daily.sunrise : []
   const sunsets: string[] = Array.isArray(daily.sunset) ? daily.sunset : []
 
-  const forecastItems: ForecastItem[] = dates.map((date, index) => ({
+  const allForecastItems: ForecastItem[] = dates.map((date, index) => ({
     date,
     minTemp: typeof mins[index] === 'number' ? mins[index] : 0,
     maxTemp: typeof maxes[index] === 'number' ? maxes[index] : 0,
     description: describeWeatherCode(codes[index]),
     code: typeof codes[index] === 'number' ? codes[index] : undefined,
   }))
+
+  // Derive "today" in the location's timezone using utc_offset_seconds,
+  // then start the forecast strictly after that (tomorrow) and take 15 days.
+  const offsetSeconds = typeof forecastJson.utc_offset_seconds === 'number'
+    ? forecastJson.utc_offset_seconds
+    : 0
+  const locationNow = new Date(Date.now() + offsetSeconds * 1000)
+  const todayKey = locationNow.toISOString().slice(0, 10)
+
+  const forecastItems: ForecastItem[] = allForecastItems
+    .filter((item) => item.date > todayKey)
+    .slice(0, 15)
 
   const hourlyBlock = forecastJson.hourly ?? {}
   const hourlyTimes: string[] = Array.isArray(hourlyBlock.time) ? hourlyBlock.time : []

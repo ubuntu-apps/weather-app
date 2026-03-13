@@ -352,6 +352,11 @@ body,
   cursor: pointer;
 }
 
+.location-choice-active {
+  border-color: #38bdf8;
+  background: rgba(15, 23, 42, 0.95);
+}
+
 .location-choice-name {
   display: block;
   font-weight: 600;

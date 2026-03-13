@@ -1,6 +1,7 @@
 import '../../App.css'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent } from 'react'
 import type {
   ActiveTab,
   CurrentWeather,
@@ -13,6 +14,7 @@ import type {
   WeatherSnapshot,
 } from './weatherTypes'
 import { fetchWeatherSnapshot } from './api'
+import { glyphForWeatherCode, convertTemp, formatTimeLabel } from './utils'
 import { LocationInputRow, useLocationLookup } from '../../components/LocationInput'
 import { BottomNav, type BottomNavItem } from '../../components/BottomNav'
 import { TodayIcon, ForecastIcon, InfoIcon } from '../../components/icons'
@@ -21,50 +23,6 @@ import { STORAGE_LOCATION_KEY, STORAGE_SNAPSHOT_KEY, STORAGE_UNIT_KEY } from '..
 
 type NavigatorLike = Navigator & { vendor?: string }
 type WindowLike = Window & { opera?: string }
-
-function describeWeatherCode(code: unknown): string {
-  const n = typeof code === 'number' ? code : Number(code)
-
-  if (Number.isNaN(n)) return 'Unknown conditions'
-
-  if (n === 0) return 'Clear sky'
-  if (n === 1 || n === 2 || n === 3) return 'Partly cloudy'
-  if (n === 45 || n === 48) return 'Foggy'
-  if (n === 51 || n === 53 || n === 55) return 'Drizzle'
-  if (n === 56 || n === 57) return 'Freezing drizzle'
-  if (n === 61 || n === 63 || n === 65) return 'Rain'
-  if (n === 66 || n === 67) return 'Freezing rain'
-  if (n === 71 || n === 73 || n === 75) return 'Snow'
-  if (n === 77) return 'Snow grains'
-  if (n === 80 || n === 81 || n === 82) return 'Rain showers'
-  if (n === 85 || n === 86) return 'Snow showers'
-  if (n === 95) return 'Thunderstorm'
-  if (n === 96 || n === 99) return 'Thunderstorm with hail'
-
-  return 'Unknown conditions'
-}
-
-function glyphForWeatherCode(code: unknown): string | null {
-  const n = typeof code === 'number' ? code : Number(code)
-  if (Number.isNaN(n)) return null
-
-  if (n === 0) return '☀️'
-  if (n === 1 || n === 2) return '🌤️'
-  if (n === 3) return '☁️'
-  if (n === 45 || n === 48) return '🌫️'
-  if (n === 51 || n === 53 || n === 55) return '🌦️'
-  if (n === 56 || n === 57) return '🌧️'
-  if (n === 61 || n === 63 || n === 65) return '🌧️'
-  if (n === 66 || n === 67) return '🌧️'
-  if (n === 71 || n === 73 || n === 75) return '❄️'
-  if (n === 77) return '❄️'
-  if (n === 80 || n === 81 || n === 82) return '🌦️'
-  if (n === 85 || n === 86) return '🌨️'
-  if (n === 95) return '⛈️'
-  if (n === 96 || n === 99) return '⛈️'
-
-  return null
-}
 
 function detectPlatform(): Platform {
   if (typeof navigator === 'undefined') return 'desktop'
@@ -128,21 +86,6 @@ function loadStoredUnit(): TemperatureUnit {
   return 'C'
 }
 
-function convertTemp(value: number, unit: TemperatureUnit): number {
-  if (!Number.isFinite(value)) return 0
-  return unit === 'C' ? value : value * (9 / 5) + 32
-}
-
-function formatTimeLabel(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-  })
-}
-
 const infoText = `Cross-device weather app.
 
 This app reuses the same shell patterns as the mortgage calculator:
@@ -183,6 +126,10 @@ export function WeatherScreen() {
   const [offline, setOffline] = useState<boolean>(typeof navigator !== 'undefined' ? !navigator.onLine : false)
   const [unit, setUnit] = useState<TemperatureUnit>(() => loadStoredUnit())
   const { candidates, runLookup, clearCandidates } = useLocationLookup()
+  const [activeCandidateIndex, setActiveCandidateIndex] = useState(0)
+  const candidatesListRef = useRef<HTMLDivElement | null>(null)
+  const candidateButtonRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const locationInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     function handleOnline() {
@@ -201,6 +148,23 @@ export function WeatherScreen() {
       window.removeEventListener('offline', handleOffline)
     }
   }, [])
+
+  useEffect(() => {
+    if (candidates.length > 0) {
+      // when a new list of candidates appears, default selection to first row
+      setActiveCandidateIndex(0)
+      // move focus to the first row so that Enter/arrows work naturally
+      const firstBtn = candidateButtonRefs.current[0]
+      if (firstBtn) {
+        firstBtn.focus()
+      } else {
+        candidatesListRef.current?.focus()
+      }
+    } else {
+      setActiveCandidateIndex(-1)
+      candidateButtonRefs.current = []
+    }
+  }, [candidates.length])
 
   useEffect(() => {
     let cancelled = false
@@ -316,6 +280,42 @@ export function WeatherScreen() {
     }
   }
 
+  function handleCandidateKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (candidates.length === 0) return
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setActiveCandidateIndex((prev) => {
+        const next = (prev + 1) % candidates.length
+        const btn = candidateButtonRefs.current[next]
+        if (btn) {
+          btn.focus()
+        }
+        return next
+      })
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setActiveCandidateIndex((prev) => {
+        const next = (prev - 1 + candidates.length) % candidates.length
+        const btn = candidateButtonRefs.current[next]
+        if (btn) {
+          btn.focus()
+        }
+        return next
+      })
+    } else if (event.key === 'Enter') {
+      event.preventDefault()
+      const candidate = candidates[activeCandidateIndex]
+      if (candidate) {
+        void handleChooseCandidate(candidate)
+      }
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      setActiveCandidateIndex(-1)
+      locationInputRef.current?.focus()
+    }
+  }
+
   function handleChangeUnit(next: TemperatureUnit) {
     if (next === unit) return
     setUnit(next)
@@ -382,6 +382,7 @@ export function WeatherScreen() {
             buttonLabel="Location"
             onChange={setInputLocation}
             onApply={handleApplyLocation}
+            inputRef={locationInputRef}
           />
 
           <div className="unit-toggle-row">
@@ -416,12 +417,22 @@ export function WeatherScreen() {
               <p className="location-choices-title">
                 Multiple locations found for <strong>{location}</strong>. Choose one:
               </p>
-              <div className="location-choices-list">
-                {candidates.map((candidate) => (
+              <div
+                className="location-choices-list"
+                ref={candidatesListRef}
+                tabIndex={0}
+                onKeyDown={handleCandidateKeyDown}
+              >
+                {candidates.map((candidate, index) => (
                   <button
                     key={candidate.id}
+                    ref={(el) => {
+                      candidateButtonRefs.current[index] = el
+                    }}
                     type="button"
-                    className="location-choice"
+                    className={`location-choice ${
+                      index === activeCandidateIndex ? 'location-choice-active' : ''
+                    }`}
                     onClick={() => {
                       void handleChooseCandidate(candidate)
                     }}
@@ -477,6 +488,26 @@ export function WeatherScreen() {
                       <div className="metric-label">Humidity</div>
                       <div className="metric-value">{Math.round(current.humidity)}%</div>
                     </div>
+                    {typeof current.windSpeed === 'number' && (
+                      <div className="metric">
+                        <div className="metric-label">Wind</div>
+                        <div className="metric-value">
+                          {Math.round(current.windSpeed)}
+                          {' '}
+                          km/h
+                        </div>
+                      </div>
+                    )}
+                    {typeof current.pressure === 'number' && (
+                      <div className="metric">
+                        <div className="metric-label">Pressure</div>
+                        <div className="metric-value">
+                          {Math.round(current.pressure)}
+                          {' '}
+                          hPa
+                        </div>
+                      </div>
+                    )}
                     <div className="metric">
                       <div className="metric-label">Sunrise</div>
                       <div className="metric-value metric-updated">{formatTimeLabel(sunrise)}</div>
