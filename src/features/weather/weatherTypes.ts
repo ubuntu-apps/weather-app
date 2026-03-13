@@ -14,8 +14,12 @@ export interface CurrentWeather {
   feelsLike: number
   humidity: number
   windSpeed?: number
+  windDirection?: number
+  windGusts?: number
   pressure?: number
   uvIndex?: number
+  visibility?: number
+  cloudCover?: number
   description: string
   code?: number
   updatedAt: number
@@ -26,6 +30,9 @@ export interface HourlyEntry {
   temperature: number
   apparentTemperature: number
   precipitationProbability?: number
+  windSpeed?: number
+  windDirection?: number
+  windGusts?: number
   code?: number
 }
 
@@ -35,6 +42,10 @@ export interface ForecastItem {
   maxTemp: number
   description: string
   code?: number
+  uvIndex?: number
+  precipitationProbabilityMax?: number
+  rainSum?: number
+  sunshineDuration?: number
 }
 
 export interface WeatherSnapshot {
