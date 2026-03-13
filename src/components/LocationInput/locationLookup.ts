@@ -1,5 +1,5 @@
-import type { GeoCandidate } from '../../weatherTypes'
-import { US_STATE_MAP } from '../../weatherConstants'
+import type { GeoCandidate } from '../../features/weather/weatherTypes'
+import { US_STATE_MAP } from './locationInputConstants'
 
 export interface LocationLookupResult {
   primary: GeoCandidate | null
