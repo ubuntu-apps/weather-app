@@ -177,6 +177,10 @@ body,
   padding: 0.4rem 0.35rem;
 }
 
+.app-shell--android .hourly-section {
+  margin-bottom: 1.5rem;
+}
+
 .bottom-nav-inner {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -452,6 +456,14 @@ body,
 
 .metric--right {
   margin-left: auto;
+}
+
+.metric--right .metric-value {
+  text-align: right;
+}
+
+.metric--right .metric-label {
+  text-align: right;
 }
 
 .metric {
