@@ -414,10 +414,11 @@ export function WeatherScreen() {
           <div className="status-row">
             {offline && <span className="status-pill status-pill-offline">Offline</span>}
             {status === 'loading' && <span className="status-pill">Loading…</span>}
-            {status === 'success' && dataSource && (
-              <span className="status-pill">
-                {dataSource === 'live' ? 'Live data' : 'Using last known data'}
-              </span>
+            {status === 'success' && !offline && dataSource === 'live' && (
+              <span className="status-pill">Live data</span>
+            )}
+            {status === 'success' && !offline && dataSource === 'cache' && (
+              <span className="status-pill">Using last known data</span>
             )}
           </div>
 
@@ -481,6 +482,12 @@ export function WeatherScreen() {
                       </div>
                     </div>
                     <div className="weather-temp-block">
+                      {offline && (
+                        <div className="weather-updated-inline">
+                          <div className="metric-label">Updated</div>
+                          <div className="metric-value metric-updated">{updatedLabel}</div>
+                        </div>
+                      )}
                       <div className="weather-temp">
                         {Math.round(convertTemp(current.temperature, unit))}
                         {unitSuffix}
@@ -492,7 +499,7 @@ export function WeatherScreen() {
                     </div>
                   </div>
 
-                  <div className="weather-metrics">
+                    <div className="weather-metrics">
                     <div className="weather-metrics-row weather-metrics-row--first">
                       <div className="metric">
                         <div className="metric-label">Humidity</div>
@@ -524,10 +531,6 @@ export function WeatherScreen() {
                           </div>
                         </div>
                       )}
-                      <div className="metric metric--right">
-                        <div className="metric-label">Updated</div>
-                        <div className="metric-value metric-updated">{updatedLabel}</div>
-                      </div>
                     </div>
                     <div className="weather-metrics-row weather-metrics-row--second">
                       {typeof current.uvIndex === 'number' && (

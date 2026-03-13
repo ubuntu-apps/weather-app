@@ -76,6 +76,12 @@ body,
   );
 }
 
+.app-shell--android .app-content {
+  padding-bottom: calc(
+    var(--nav-height, 4rem) + env(safe-area-inset-bottom, 0px) + 1.5rem
+  );
+}
+
 .card {
   background: radial-gradient(circle at top left, #111827 0, #020617 60%);
   border-radius: 1rem;
@@ -452,6 +458,11 @@ body,
 
 .metric--right {
   margin-left: auto;
+}
+
+.weather-updated-inline {
+  text-align: right;
+  margin-bottom: 0.1rem;
 }
 
 .metric {
