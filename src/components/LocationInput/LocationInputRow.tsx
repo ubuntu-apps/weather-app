@@ -1,4 +1,4 @@
-import type { ChangeEventHandler, FC, KeyboardEventHandler } from 'react'
+import type { ChangeEventHandler, FC, KeyboardEventHandler, Ref } from 'react'
 
 export interface LocationInputRowProps {
   value: string
@@ -6,6 +6,7 @@ export interface LocationInputRowProps {
   buttonLabel?: string
   onChange: (value: string) => void
   onApply: () => void
+  inputRef?: Ref<HTMLInputElement>
 }
 
 export const LocationInputRow: FC<LocationInputRowProps> = ({
@@ -14,6 +15,7 @@ export const LocationInputRow: FC<LocationInputRowProps> = ({
   buttonLabel = 'Use location',
   onChange,
   onApply,
+  inputRef,
 }) => {
   const handleChange: ChangeEventHandler<HTMLInputElement> = (event) => {
     onChange(event.target.value)
@@ -34,6 +36,7 @@ export const LocationInputRow: FC<LocationInputRowProps> = ({
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
+          ref={inputRef}
           placeholder={placeholder}
         />
       </div>

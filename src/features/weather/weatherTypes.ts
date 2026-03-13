@@ -13,6 +13,9 @@ export interface CurrentWeather {
   temperature: number
   feelsLike: number
   humidity: number
+  windSpeed?: number
+  pressure?: number
+  uvIndex?: number
   description: string
   code?: number
   updatedAt: number
