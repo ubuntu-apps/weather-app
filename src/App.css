@@ -425,9 +425,33 @@ body,
 
 .weather-metrics {
   display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.weather-metrics-row {
+  display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-top: 0.25rem;
+}
+
+.weather-metrics-row--first {
+  align-items: flex-start;
+}
+
+.weather-metrics-row--second {
+  padding-top: 0.25rem;
+  border-top: 1px dashed rgba(75, 85, 99, 0.5);
+}
+
+.weather-metrics-row--sun {
+  padding-top: 0.25rem;
+  border-top: 1px dashed rgba(75, 85, 99, 0.5);
+}
+
+.metric--right {
+  margin-left: auto;
 }
 
 .metric {
@@ -467,7 +491,7 @@ body,
 }
 
 .hourly-item {
-  min-width: 4.4rem;
+  min-width: 5.5rem;
   padding: 0.25rem 0.4rem;
   border-radius: 0.6rem;
   background: rgba(15, 23, 42, 0.9);
@@ -500,6 +524,16 @@ body,
 .hourly-pop {
   font-size: 0.7rem;
   color: #60a5fa;
+}
+
+.hourly-wind {
+  font-size: 0.7rem;
+  color: #9ca3af;
+}
+
+.hourly-gusts {
+  font-size: 0.65rem;
+  color: #9ca3af;
 }
 
 .location-choices {
@@ -568,8 +602,28 @@ body,
 
 .forecast-main {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
+  justify-content: flex-end;
   gap: 0.75rem;
+  text-align: right;
+}
+
+.forecast-main .forecast-description,
+.forecast-main .forecast-temps {
+  justify-content: flex-end;
+}
+
+.forecast-meta {
+  flex-basis: 100%;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 0.2rem;
+  text-align: right;
+}
+
+.forecast-meta-item:not(:last-child)::after {
+  content: ' · ';
 }
 
 .forecast-description {

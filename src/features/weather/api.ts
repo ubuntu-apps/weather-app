@@ -18,14 +18,39 @@ export async function fetchWeatherSnapshot(
       'relative_humidity_2m',
       'weather_code',
       'wind_speed_10m',
+      'wind_direction_10m',
+      'wind_gusts_10m',
       'surface_pressure',
+      'visibility',
+      'cloud_cover',
     ].join(','),
   )
   forecastUrl.searchParams.set(
     'hourly',
-    'temperature_2m,apparent_temperature,precipitation_probability,weather_code',
+    [
+      'temperature_2m',
+      'apparent_temperature',
+      'precipitation_probability',
+      'weather_code',
+      'wind_speed_10m',
+      'wind_direction_10m',
+      'wind_gusts_10m',
+    ].join(','),
   )
-  forecastUrl.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset')
+  forecastUrl.searchParams.set(
+    'daily',
+    [
+      'temperature_2m_max',
+      'temperature_2m_min',
+      'weather_code',
+      'sunrise',
+      'sunset',
+      'uv_index_max',
+      'precipitation_probability_max',
+      'rain_sum',
+      'sunshine_duration',
+    ].join(','),
+  )
   // request enough days that, after skipping today, we can show a 15‑day forecast
   forecastUrl.searchParams.set('forecast_days', '16')
   forecastUrl.searchParams.set('timezone', 'auto')
@@ -40,7 +65,11 @@ export async function fetchWeatherSnapshot(
   const currentBlock = forecastJson.current ?? {}
   const humidityValue = forecastJson.current?.relative_humidity_2m
   const windSpeedValue = forecastJson.current?.wind_speed_10m
+  const windDirValue = forecastJson.current?.wind_direction_10m
+  const windGustsValue = forecastJson.current?.wind_gusts_10m
   const pressureValue = forecastJson.current?.surface_pressure
+  const visibilityValue = forecastJson.current?.visibility
+  const cloudCoverValue = forecastJson.current?.cloud_cover
 
   const current: CurrentWeather = {
     city: name,
@@ -55,7 +84,11 @@ export async function fetchWeatherSnapshot(
           : 0,
     humidity: typeof humidityValue === 'number' ? humidityValue : 0,
     windSpeed: typeof windSpeedValue === 'number' ? windSpeedValue : undefined,
+    windDirection: typeof windDirValue === 'number' ? windDirValue : undefined,
+    windGusts: typeof windGustsValue === 'number' ? windGustsValue : undefined,
     pressure: typeof pressureValue === 'number' ? pressureValue : undefined,
+    visibility: typeof visibilityValue === 'number' ? visibilityValue : undefined,
+    cloudCover: typeof cloudCoverValue === 'number' ? cloudCoverValue : undefined,
     description: describeWeatherCode(currentBlock.weather_code),
     code: typeof currentBlock.weather_code === 'number' ? currentBlock.weather_code : undefined,
     updatedAt: Date.now(),
@@ -68,6 +101,14 @@ export async function fetchWeatherSnapshot(
   const codes: number[] = Array.isArray(daily.weather_code) ? daily.weather_code : []
   const sunrises: string[] = Array.isArray(daily.sunrise) ? daily.sunrise : []
   const sunsets: string[] = Array.isArray(daily.sunset) ? daily.sunset : []
+  const uvIndexes: number[] = Array.isArray(daily.uv_index_max) ? daily.uv_index_max : []
+  const precipProbMax: number[] = Array.isArray(daily.precipitation_probability_max)
+    ? daily.precipitation_probability_max
+    : []
+  const rainSums: number[] = Array.isArray(daily.rain_sum) ? daily.rain_sum : []
+  const sunshineDurations: number[] = Array.isArray(daily.sunshine_duration)
+    ? daily.sunshine_duration
+    : []
 
   const allForecastItems: ForecastItem[] = dates.map((date, index) => ({
     date,
@@ -75,6 +116,12 @@ export async function fetchWeatherSnapshot(
     maxTemp: typeof maxes[index] === 'number' ? maxes[index] : 0,
     description: describeWeatherCode(codes[index]),
     code: typeof codes[index] === 'number' ? codes[index] : undefined,
+    uvIndex: typeof uvIndexes[index] === 'number' ? uvIndexes[index] : undefined,
+    precipitationProbabilityMax:
+      typeof precipProbMax[index] === 'number' ? precipProbMax[index] : undefined,
+    rainSum: typeof rainSums[index] === 'number' ? rainSums[index] : undefined,
+    sunshineDuration:
+      typeof sunshineDurations[index] === 'number' ? sunshineDurations[index] : undefined,
   }))
 
   // Derive "today" in the location's timezone using utc_offset_seconds,
@@ -89,6 +136,12 @@ export async function fetchWeatherSnapshot(
     .filter((item) => item.date > todayKey)
     .slice(0, 15)
 
+  // Today's UV from daily index 0 (today)
+  const todayUv = uvIndexes[0]
+  if (typeof todayUv === 'number') {
+    current.uvIndex = todayUv
+  }
+
   const hourlyBlock = forecastJson.hourly ?? {}
   const hourlyTimes: string[] = Array.isArray(hourlyBlock.time) ? hourlyBlock.time : []
   const hourlyTemps: number[] = Array.isArray(hourlyBlock.temperature_2m) ? hourlyBlock.temperature_2m : []
@@ -99,6 +152,13 @@ export async function fetchWeatherSnapshot(
     ? hourlyBlock.precipitation_probability
     : []
   const hourlyCodes: number[] = Array.isArray(hourlyBlock.weather_code) ? hourlyBlock.weather_code : []
+  const hourlyWind: number[] = Array.isArray(hourlyBlock.wind_speed_10m) ? hourlyBlock.wind_speed_10m : []
+  const hourlyWindDir: number[] = Array.isArray(hourlyBlock.wind_direction_10m)
+    ? hourlyBlock.wind_direction_10m
+    : []
+  const hourlyWindGusts: number[] = Array.isArray(hourlyBlock.wind_gusts_10m)
+    ? hourlyBlock.wind_gusts_10m
+    : []
 
   const nowTime = Date.now()
   const cutoff = nowTime + 24 * 60 * 60 * 1000
@@ -118,6 +178,9 @@ export async function fetchWeatherSnapshot(
               ? hourlyTemps[index]
               : 0,
         precipitationProbability: typeof hourlyPop[index] === 'number' ? hourlyPop[index] : undefined,
+        windSpeed: typeof hourlyWind[index] === 'number' ? hourlyWind[index] : undefined,
+        windDirection: typeof hourlyWindDir[index] === 'number' ? hourlyWindDir[index] : undefined,
+        windGusts: typeof hourlyWindGusts[index] === 'number' ? hourlyWindGusts[index] : undefined,
         code: typeof hourlyCodes[index] === 'number' ? hourlyCodes[index] : undefined,
       } as HourlyEntry
     })

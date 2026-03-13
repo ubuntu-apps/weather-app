@@ -14,7 +14,15 @@ import type {
   WeatherSnapshot,
 } from './weatherTypes'
 import { fetchWeatherSnapshot } from './api'
-import { glyphForWeatherCode, convertTemp, formatTimeLabel } from './utils'
+import {
+  glyphForWeatherCode,
+  convertTemp,
+  formatTimeLabel,
+  convertWindSpeed,
+  windSpeedUnit,
+  windDirectionToCardinal,
+  uvIndexLabel,
+} from './utils'
 import { LocationInputRow, useLocationLookup } from '../../components/LocationInput'
 import { BottomNav, type BottomNavItem } from '../../components/BottomNav'
 import { TodayIcon, ForecastIcon, InfoIcon } from '../../components/icons'
@@ -339,6 +347,7 @@ export function WeatherScreen() {
       : 'No data yet'
 
   const unitSuffix = unit === 'C' ? '°C' : '°F'
+  const windUnit = windSpeedUnit(unit)
 
   const navItems: BottomNavItem[] = [
     {
@@ -484,41 +493,75 @@ export function WeatherScreen() {
                   </div>
 
                   <div className="weather-metrics">
-                    <div className="metric">
-                      <div className="metric-label">Humidity</div>
-                      <div className="metric-value">{Math.round(current.humidity)}%</div>
-                    </div>
-                    {typeof current.windSpeed === 'number' && (
+                    <div className="weather-metrics-row weather-metrics-row--first">
                       <div className="metric">
-                        <div className="metric-label">Wind</div>
-                        <div className="metric-value">
-                          {Math.round(current.windSpeed)}
-                          {' '}
-                          km/h
-                        </div>
+                        <div className="metric-label">Humidity</div>
+                        <div className="metric-value">{Math.round(current.humidity)}%</div>
                       </div>
-                    )}
-                    {typeof current.pressure === 'number' && (
+                      {typeof current.windSpeed === 'number' && (
+                        <div className="metric">
+                          <div className="metric-label">Wind</div>
+                          <div className="metric-value">
+                            {Math.round(convertWindSpeed(current.windSpeed, unit))}
+                            {' '}
+                            {windUnit}
+                            {typeof current.windDirection === 'number' && current.windDirection !== undefined && (
+                              <> {windDirectionToCardinal(current.windDirection)}</>
+                            )}
+                            {typeof current.windGusts === 'number' && current.windGusts > current.windSpeed && (
+                              <> · gusts {Math.round(convertWindSpeed(current.windGusts, unit))}</>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {typeof current.pressure === 'number' && (
+                        <div className="metric">
+                          <div className="metric-label">Pressure</div>
+                          <div className="metric-value">
+                            {Math.round(current.pressure)}
+                            {' '}
+                            hPa
+                          </div>
+                        </div>
+                      )}
+                      <div className="metric metric--right">
+                        <div className="metric-label">Updated</div>
+                        <div className="metric-value metric-updated">{updatedLabel}</div>
+                      </div>
+                    </div>
+                    <div className="weather-metrics-row weather-metrics-row--second">
+                      {typeof current.uvIndex === 'number' && (
+                        <div className="metric">
+                          <div className="metric-label">UV</div>
+                          <div className="metric-value">
+                            {current.uvIndex}
+                            {' '}
+                            ({uvIndexLabel(current.uvIndex)})
+                          </div>
+                        </div>
+                      )}
+                      {typeof current.visibility === 'number' && (
+                        <div className="metric">
+                          <div className="metric-label">Visibility</div>
+                          <div className="metric-value">{(current.visibility / 1000).toFixed(1)} km</div>
+                        </div>
+                      )}
+                      {typeof current.cloudCover === 'number' && (
+                        <div className="metric">
+                          <div className="metric-label">Clouds</div>
+                          <div className="metric-value">{Math.round(current.cloudCover)}%</div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="weather-metrics-row weather-metrics-row--sun">
                       <div className="metric">
-                        <div className="metric-label">Pressure</div>
-                        <div className="metric-value">
-                          {Math.round(current.pressure)}
-                          {' '}
-                          hPa
-                        </div>
+                        <div className="metric-label">Sunrise</div>
+                        <div className="metric-value metric-updated">{formatTimeLabel(sunrise)}</div>
                       </div>
-                    )}
-                    <div className="metric">
-                      <div className="metric-label">Sunrise</div>
-                      <div className="metric-value metric-updated">{formatTimeLabel(sunrise)}</div>
-                    </div>
-                    <div className="metric">
-                      <div className="metric-label">Sunset</div>
-                      <div className="metric-value metric-updated">{formatTimeLabel(sunset)}</div>
-                    </div>
-                    <div className="metric">
-                      <div className="metric-label">Updated</div>
-                      <div className="metric-value metric-updated">{updatedLabel}</div>
+                      <div className="metric">
+                        <div className="metric-label">Sunset</div>
+                        <div className="metric-value metric-updated">{formatTimeLabel(sunset)}</div>
+                      </div>
                     </div>
                   </div>
 
@@ -554,6 +597,23 @@ export function WeatherScreen() {
                                   {Math.round(entry.precipitationProbability)}%
                                 </div>
                               )}
+                              {typeof entry.windSpeed === 'number' && (
+                                <>
+                                  <div className="hourly-wind">
+                                    {Math.round(convertWindSpeed(entry.windSpeed, unit))}
+                                    {' '}
+                                    {windUnit}
+                                    {typeof entry.windDirection === 'number' && entry.windDirection !== undefined && (
+                                      <> {windDirectionToCardinal(entry.windDirection)}</>
+                                    )}
+                                  </div>
+                                  {typeof entry.windGusts === 'number' && entry.windGusts > (entry.windSpeed ?? 0) && (
+                                    <div className="hourly-gusts">
+                                      gusts {Math.round(convertWindSpeed(entry.windGusts, unit))}
+                                    </div>
+                                  )}
+                                </>
+                              )}
                             </div>
                           )
                         })}
@@ -573,7 +633,9 @@ export function WeatherScreen() {
                 <p>No forecast available yet. Once we have current weather, we will show a 5-day view here.</p>
               ) : (
                 <div className="forecast-list">
-                  {forecast.map((item) => (
+                  {forecast
+                    .filter((item) => item.date > new Date().toISOString().slice(0, 10))
+                    .map((item) => (
                     <div key={item.date} className="forecast-item">
                       <div className="forecast-date">
                         {new Date(item.date).toLocaleDateString(undefined, {
@@ -603,6 +665,33 @@ export function WeatherScreen() {
                             {unitSuffix}
                           </span>
                         </div>
+                        {(typeof item.precipitationProbabilityMax === 'number' ||
+                          typeof item.uvIndex === 'number' ||
+                          typeof item.rainSum === 'number' ||
+                          typeof item.sunshineDuration === 'number') && (
+                          <div className="forecast-meta">
+                            {typeof item.precipitationProbabilityMax === 'number' && (
+                              <span className="forecast-meta-item">
+                                {Math.round(item.precipitationProbabilityMax)}% rain
+                              </span>
+                            )}
+                            {typeof item.uvIndex === 'number' && (
+                              <span className="forecast-meta-item">
+                                UV {item.uvIndex}
+                                {' '}
+                                ({uvIndexLabel(item.uvIndex)})
+                              </span>
+                            )}
+                            {typeof item.rainSum === 'number' && item.rainSum > 0 && (
+                              <span className="forecast-meta-item">{item.rainSum} mm</span>
+                            )}
+                            {typeof item.sunshineDuration === 'number' && (
+                              <span className="forecast-meta-item">
+                                {Number((item.sunshineDuration / 3600).toFixed(1))}h sun
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

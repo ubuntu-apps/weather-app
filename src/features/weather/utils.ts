@@ -59,3 +59,31 @@ export function formatTimeLabel(iso: string | null | undefined): string {
   })
 }
 
+/** Wind speed: API gives km/h. Show mph when unit is °F, else km/h. */
+export function convertWindSpeed(kmh: number, unit: TemperatureUnit): number {
+  if (!Number.isFinite(kmh)) return 0
+  return unit === 'F' ? kmh * 0.621371 : kmh
+}
+
+export function windSpeedUnit(unit: TemperatureUnit): 'km/h' | 'mph' {
+  return unit === 'F' ? 'mph' : 'km/h'
+}
+
+/** Convert wind direction in degrees (0–360) to cardinal, e.g. "N", "NE", "E". */
+export function windDirectionToCardinal(degrees: number): string {
+  if (!Number.isFinite(degrees)) return ''
+  const cards = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
+  const index = Math.round(((degrees % 360) + 360) % 360 / 22.5) % 16
+  return cards[index] ?? 'N'
+}
+
+/** Human-readable UV index label. */
+export function uvIndexLabel(uv: number): string {
+  if (!Number.isFinite(uv)) return ''
+  if (uv <= 2) return 'Low'
+  if (uv <= 5) return 'Moderate'
+  if (uv <= 7) return 'High'
+  if (uv <= 10) return 'Very high'
+  return 'Extreme'
+}
+
