@@ -55,3 +55,11 @@ export interface GeoCandidate {
   longitude: number
 }
 
+export interface WeatherApiLocation {
+  latitude: number
+  longitude: number
+  name: string
+  admin1?: string
+  country?: string
+}
+
