@@ -559,11 +559,6 @@ body,
   border-top: 1px dashed rgba(75, 85, 99, 0.5);
 }
 
-.weather-metrics-row--sun {
-  padding-top: 0.25rem;
-  border-top: 1px dashed rgba(75, 85, 99, 0.5);
-}
-
 .metric--right {
   margin-left: auto;
 }
