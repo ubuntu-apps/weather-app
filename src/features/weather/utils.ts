@@ -69,6 +69,16 @@ export function windSpeedUnit(unit: TemperatureUnit): 'km/h' | 'mph' {
   return unit === 'F' ? 'mph' : 'km/h'
 }
 
+/** Precipitation: show mm when °C, in when °F. 1 mm = 0.0393700787 in */
+export function convertPrecipitation(mm: number, unit: TemperatureUnit): number {
+  if (!Number.isFinite(mm)) return 0
+  return unit === 'F' ? mm * 0.0393700787 : mm
+}
+
+export function precipitationUnit(unit: TemperatureUnit): 'mm' | 'in' {
+  return unit === 'F' ? 'in' : 'mm'
+}
+
 /** Convert wind direction in degrees (0–360) to cardinal, e.g. "N", "NE", "E". */
 export function windDirectionToCardinal(degrees: number): string {
   if (!Number.isFinite(degrees)) return ''

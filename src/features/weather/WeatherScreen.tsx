@@ -23,7 +23,8 @@ import {
   convertWindSpeed,
   windSpeedUnit,
   windDirectionToCardinal,
-  uvIndexLabel,
+  convertPrecipitation,
+  precipitationUnit,
 } from './utils'
 import { LocationInputRow, useLocationLookup } from '../../components/LocationInput'
 import { BottomNav, type BottomNavItem } from '../../components/BottomNav'
@@ -727,15 +728,9 @@ export function WeatherScreen() {
                       {typeof current.uvIndex === 'number' && (
                         <div className="metric">
                           <div className="metric-label">UV</div>
-                          <div className="metric-value">
-                            {current.uvIndex}
-                            {' '}
-                            ({uvIndexLabel(current.uvIndex)})
-                          </div>
+                          <div className="metric-value">{current.uvIndex}</div>
                         </div>
                       )}
-                    </div>
-                    <div className="weather-metrics-row weather-metrics-row--sun">
                       <div className="metric">
                         <div className="metric-label">Sunrise</div>
                         <div className="metric-value metric-updated">{formatTimeLabel(sunrise)}</div>
@@ -853,20 +848,22 @@ export function WeatherScreen() {
                                 {Math.round(item.precipitationProbabilityMax)}% rain
                               </span>
                             )}
-                            {typeof item.uvIndex === 'number' && (
-                              <span className="forecast-meta-item">
-                                UV {item.uvIndex}
-                                {' '}
-                                ({uvIndexLabel(item.uvIndex)})
-                              </span>
-                            )}
                             {typeof item.rainSum === 'number' && item.rainSum > 0 && (
-                              <span className="forecast-meta-item">{item.rainSum} mm</span>
+                              <span className="forecast-meta-item">
+                                {unit === 'F'
+                                  ? convertPrecipitation(item.rainSum, unit).toFixed(2)
+                                  : item.rainSum}
+                                {' '}
+                                {precipitationUnit(unit)}
+                              </span>
                             )}
                             {typeof item.sunshineDuration === 'number' && (
                               <span className="forecast-meta-item">
                                 {Number((item.sunshineDuration / 3600).toFixed(1))}h sun
                               </span>
+                            )}
+                            {typeof item.uvIndex === 'number' && (
+                              <span className="forecast-meta-item">UV {item.uvIndex}</span>
                             )}
                           </div>
                         )}
