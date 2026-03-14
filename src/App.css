@@ -255,6 +255,7 @@ body,
 
 .location-input-shell {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 0.25rem;
@@ -262,6 +263,19 @@ body,
   border: 1px solid rgba(148, 163, 184, 0.7);
   background: radial-gradient(circle at top left, #020617 0, #020617 55%, #020617 100%);
   padding: 0.25rem 0.5rem 0.25rem 0.75rem;
+}
+
+.app-shell--android .location-row {
+  min-width: 0;
+}
+
+.app-shell--android .location-input-shell {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+.app-shell--android .btn-location {
+  flex-shrink: 0;
 }
 
 .location-input {
