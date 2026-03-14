@@ -77,6 +77,19 @@ export function windDirectionToCardinal(degrees: number): string {
   return cards[index] ?? 'N'
 }
 
+/** Format a YYYY-MM-DD date string for display in local time (avoids UTC-midnight shift). */
+export function formatForecastDate(dateStr: string): string {
+  const parts = dateStr.split('-').map(Number)
+  if (parts.length !== 3) return dateStr
+  const [y, m, d] = parts
+  const date = new Date(y, m - 1, d)
+  return date.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
 /** Human-readable UV index label. */
 export function uvIndexLabel(uv: number): string {
   if (!Number.isFinite(uv)) return ''

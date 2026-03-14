@@ -250,24 +250,56 @@ body,
   display: flex;
   gap: 0.5rem;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.2rem;
 }
 
 .location-input-shell {
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.7);
   background: radial-gradient(circle at top left, #020617 0, #020617 55%, #020617 100%);
-  padding: 0.25rem 0.75rem;
+  padding: 0.25rem 0.5rem 0.25rem 0.75rem;
 }
 
 .location-input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   border: none;
   outline: none;
   background: transparent;
   color: #e5e7eb;
   font-size: 0.9rem;
+}
+
+.location-input-clear,
+.location-input-recent-trigger {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.25);
+  color: #e5e7eb;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.location-input-clear:hover,
+.location-input-recent-trigger:hover {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+.location-input-clear svg,
+.location-input-recent-trigger svg {
+  display: block;
 }
 
 .location-input::placeholder {
@@ -286,10 +318,11 @@ body,
   white-space: nowrap;
 }
 
-.status-row {
+.unit-and-status-row {
   display: flex;
-  justify-content: flex-end;
-  gap: 0.4rem;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
   margin-bottom: 0.25rem;
 }
 
@@ -297,7 +330,16 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  margin-bottom: 0.25rem;
+}
+
+.status-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.unit-and-status-row .status-row {
+  margin-bottom: 0;
 }
 
 .unit-pill {
@@ -365,6 +407,54 @@ body,
 .location-choice-active {
   border-color: #38bdf8;
   background: rgba(15, 23, 42, 0.95);
+}
+
+.recent-locations {
+  margin-top: 0.35rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(55, 65, 81, 0.9);
+  background: rgba(15, 23, 42, 0.75);
+}
+
+.recent-locations-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  color: #d1d5db;
+}
+
+.recent-locations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.recent-location-item {
+  width: 100%;
+  text-align: left;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(55, 65, 81, 0.9);
+  padding: 0.35rem 0.55rem;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.recent-location-item:hover {
+  border-color: rgba(56, 189, 248, 0.6);
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.recent-location-name {
+  display: block;
+  font-weight: 600;
+}
+
+.recent-location-meta {
+  display: block;
+  font-size: 0.75rem;
+  color: #9ca3af;
 }
 
 .location-choice-name {

@@ -12,12 +12,14 @@ import type {
   Platform,
   TemperatureUnit,
   WeatherSnapshot,
+  WeatherApiLocation,
 } from './weatherTypes'
 import { fetchWeatherSnapshot } from './api'
 import {
   glyphForWeatherCode,
   convertTemp,
   formatTimeLabel,
+  formatForecastDate,
   convertWindSpeed,
   windSpeedUnit,
   windDirectionToCardinal,
@@ -27,7 +29,13 @@ import { LocationInputRow, useLocationLookup } from '../../components/LocationIn
 import { BottomNav, type BottomNavItem } from '../../components/BottomNav'
 import { TodayIcon, ForecastIcon, InfoIcon } from '../../components/icons'
 import { APP_VERSION } from '../../version'
-import { STORAGE_LOCATION_KEY, STORAGE_SNAPSHOT_KEY, STORAGE_UNIT_KEY } from '../../components/LocationInput/locationInputConstants'
+import {
+  STORAGE_LOCATION_KEY,
+  STORAGE_SNAPSHOT_KEY,
+  STORAGE_UNIT_KEY,
+  STORAGE_RECENT_LOCATIONS_KEY,
+  RECENT_LOCATIONS_MAX,
+} from '../../components/LocationInput/locationInputConstants'
 
 type NavigatorLike = Navigator & { vendor?: string }
 type WindowLike = Window & { opera?: string }
@@ -94,6 +102,39 @@ function loadStoredUnit(): TemperatureUnit {
   return 'C'
 }
 
+function loadRecentLocations(): WeatherApiLocation[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_RECENT_LOCATIONS_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (item): item is WeatherApiLocation =>
+        item != null &&
+        typeof item === 'object' &&
+        typeof (item as WeatherApiLocation).name === 'string' &&
+        typeof (item as WeatherApiLocation).latitude === 'number' &&
+        typeof (item as WeatherApiLocation).longitude === 'number',
+    ).slice(0, RECENT_LOCATIONS_MAX)
+  } catch {
+    return []
+  }
+}
+
+function saveRecentLocations(list: WeatherApiLocation[]) {
+  try {
+    localStorage.setItem(STORAGE_RECENT_LOCATIONS_KEY, JSON.stringify(list.slice(0, RECENT_LOCATIONS_MAX)))
+  } catch {
+    // ignore
+  }
+}
+
+function addToRecentLocations(list: WeatherApiLocation[], item: WeatherApiLocation): WeatherApiLocation[] {
+  const key = (x: WeatherApiLocation) => `${x.name}|${x.latitude}|${x.longitude}`
+  const rest = list.filter((x) => key(x) !== key(item))
+  return [item, ...rest].slice(0, RECENT_LOCATIONS_MAX)
+}
+
 const infoText = `Cross-device weather app.
 
 This app reuses the same shell patterns as the mortgage calculator:
@@ -138,6 +179,10 @@ export function WeatherScreen() {
   const candidatesListRef = useRef<HTMLDivElement | null>(null)
   const candidateButtonRefs = useRef<(HTMLButtonElement | null)[]>([])
   const locationInputRef = useRef<HTMLInputElement | null>(null)
+  const appliedCoordsRef = useRef<WeatherApiLocation | null>(null)
+  const initialLoadRef = useRef(true)
+  const [recentLocations, setRecentLocations] = useState<WeatherApiLocation[]>(() => loadRecentLocations())
+  const [showRecentList, setShowRecentList] = useState(false)
 
   useEffect(() => {
     function handleOnline() {
@@ -198,6 +243,76 @@ export function WeatherScreen() {
         return
       }
 
+      const isInitialLoad = initialLoadRef.current
+      if (isInitialLoad) initialLoadRef.current = false
+
+      if (isInitialLoad && recentLocations.length > 0) {
+        const match = recentLocations[0]
+        try {
+          setStatus('loading')
+          setError(null)
+          const snapshot = await fetchWeatherSnapshot(match.name, match)
+          if (!cancelled) {
+            clearCandidates()
+            setCurrent(snapshot.current)
+            setForecast(snapshot.forecast)
+            setHourly(snapshot.hourly ?? [])
+            setSunrise(snapshot.sunrise ?? null)
+            setSunset(snapshot.sunset ?? null)
+            setStatus('success')
+            setDataSource('live')
+            saveSnapshot(snapshot)
+            setError(null)
+            setRecentLocations((prev) => {
+              const next = addToRecentLocations(prev, match)
+              saveRecentLocations(next)
+              return next
+            })
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Something went wrong while loading weather data.'
+          if (!cancelled) {
+            setStatus('error')
+            setError(message)
+          }
+        }
+        return
+      }
+
+      const known = appliedCoordsRef.current
+      if (known && known.name.toLowerCase() === location.toLowerCase()) {
+        appliedCoordsRef.current = null
+        try {
+          setStatus('loading')
+          setError(null)
+          const snapshot = await fetchWeatherSnapshot(location, known)
+          if (!cancelled) {
+            clearCandidates()
+            setCurrent(snapshot.current)
+            setForecast(snapshot.forecast)
+            setHourly(snapshot.hourly ?? [])
+            setSunrise(snapshot.sunrise ?? null)
+            setSunset(snapshot.sunset ?? null)
+            setStatus('success')
+            setDataSource('live')
+            saveSnapshot(snapshot)
+            setError(null)
+            setRecentLocations((prev) => {
+              const next = addToRecentLocations(prev, known)
+              saveRecentLocations(next)
+              return next
+            })
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Something went wrong while loading weather data.'
+          if (!cancelled) {
+            setStatus('error')
+            setError(message)
+          }
+        }
+        return
+      }
+
       try {
         setStatus('loading')
         setError(null)
@@ -234,6 +349,18 @@ export function WeatherScreen() {
           setDataSource('live')
           saveSnapshot(snapshot)
           setError(null)
+          const apiLocation: WeatherApiLocation = {
+            name: primary.name,
+            latitude: primary.latitude,
+            longitude: primary.longitude,
+            admin1: primary.admin1,
+            country: primary.country,
+          }
+          setRecentLocations((prev) => {
+            const next = addToRecentLocations(prev, apiLocation)
+            saveRecentLocations(next)
+            return next
+          })
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Something went wrong while loading weather data.'
@@ -256,6 +383,22 @@ export function WeatherScreen() {
     if (!trimmed) return
     setLocation(trimmed)
     saveLocation(trimmed)
+  }
+
+  function handleApplyLocationWithCoords(apiLocation: WeatherApiLocation) {
+    appliedCoordsRef.current = apiLocation
+    setLocation(apiLocation.name)
+    setInputLocation(apiLocation.name)
+    saveLocation(apiLocation.name)
+    setShowRecentList(false)
+  }
+
+  function handleClearInput() {
+    setInputLocation('')
+  }
+
+  function handleOpenRecentList() {
+    setShowRecentList((prev) => !prev)
   }
 
   async function handleChooseCandidate(candidate: GeoCandidate) {
@@ -281,6 +424,18 @@ export function WeatherScreen() {
       setDataSource('live')
       saveSnapshot(snapshot)
       setError(null)
+      const apiLocation: WeatherApiLocation = {
+        name: candidate.name,
+        latitude: candidate.latitude,
+        longitude: candidate.longitude,
+        admin1: candidate.admin1,
+        country: candidate.country,
+      }
+      setRecentLocations((prev) => {
+        const next = addToRecentLocations(prev, apiLocation)
+        saveRecentLocations(next)
+        return next
+      })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong while loading weather data.'
       setStatus('error')
@@ -391,35 +546,59 @@ export function WeatherScreen() {
             buttonLabel="Location"
             onChange={setInputLocation}
             onApply={handleApplyLocation}
+            onClear={handleClearInput}
+            onOpenRecentList={recentLocations.length > 0 ? handleOpenRecentList : undefined}
             inputRef={locationInputRef}
           />
 
-          <div className="unit-toggle-row">
-            <button
-              type="button"
-              className={`unit-pill ${unit === 'C' ? 'unit-pill-active' : ''}`}
-              onClick={() => handleChangeUnit('C')}
-            >
-              °C
-            </button>
-            <button
-              type="button"
-              className={`unit-pill ${unit === 'F' ? 'unit-pill-active' : ''}`}
-              onClick={() => handleChangeUnit('F')}
-            >
-              °F
-            </button>
-          </div>
+          {showRecentList && recentLocations.length > 0 && (
+            <div className="recent-locations">
+              <p className="recent-locations-title">Choose from recent locations</p>
+              <div className="recent-locations-list">
+                {recentLocations.map((item) => (
+                  <button
+                    key={`${item.name}-${item.latitude}-${item.longitude}`}
+                    type="button"
+                    className="recent-location-item"
+                    onClick={() => handleApplyLocationWithCoords(item)}
+                  >
+                    <span className="recent-location-name">{item.name}</span>
+                    <span className="recent-location-meta">
+                      {[item.admin1, item.country].filter(Boolean).join(', ')}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-          <div className="status-row">
-            {offline && <span className="status-pill status-pill-offline">Offline</span>}
-            {status === 'loading' && <span className="status-pill">Loading…</span>}
-            {status === 'success' && !offline && dataSource === 'live' && (
-              <span className="status-pill">Live data</span>
-            )}
-            {status === 'success' && !offline && dataSource === 'cache' && (
-              <span className="status-pill">Using last known data</span>
-            )}
+          <div className="unit-and-status-row">
+            <div className="unit-toggle-row">
+              <button
+                type="button"
+                className={`unit-pill ${unit === 'C' ? 'unit-pill-active' : ''}`}
+                onClick={() => handleChangeUnit('C')}
+              >
+                °C
+              </button>
+              <button
+                type="button"
+                className={`unit-pill ${unit === 'F' ? 'unit-pill-active' : ''}`}
+                onClick={() => handleChangeUnit('F')}
+              >
+                °F
+              </button>
+            </div>
+            <div className="status-row">
+              {offline && <span className="status-pill status-pill-offline">Offline</span>}
+              {status === 'loading' && <span className="status-pill">Loading…</span>}
+              {status === 'success' && !offline && dataSource === 'live' && (
+                <span className="status-pill">Live data</span>
+              )}
+              {status === 'success' && !offline && dataSource === 'cache' && (
+                <span className="status-pill">Using last known data</span>
+              )}
+            </div>
           </div>
 
           {candidates.length > 0 && (
@@ -533,16 +712,6 @@ export function WeatherScreen() {
                       )}
                     </div>
                     <div className="weather-metrics-row weather-metrics-row--second">
-                      {typeof current.uvIndex === 'number' && (
-                        <div className="metric">
-                          <div className="metric-label">UV</div>
-                          <div className="metric-value">
-                            {current.uvIndex}
-                            {' '}
-                            ({uvIndexLabel(current.uvIndex)})
-                          </div>
-                        </div>
-                      )}
                       {typeof current.visibility === 'number' && (
                         <div className="metric">
                           <div className="metric-label">Visibility</div>
@@ -553,6 +722,16 @@ export function WeatherScreen() {
                         <div className="metric">
                           <div className="metric-label">Clouds</div>
                           <div className="metric-value">{Math.round(current.cloudCover)}%</div>
+                        </div>
+                      )}
+                      {typeof current.uvIndex === 'number' && (
+                        <div className="metric">
+                          <div className="metric-label">UV</div>
+                          <div className="metric-value">
+                            {current.uvIndex}
+                            {' '}
+                            ({uvIndexLabel(current.uvIndex)})
+                          </div>
                         </div>
                       )}
                     </div>
@@ -641,11 +820,7 @@ export function WeatherScreen() {
                     .map((item) => (
                     <div key={item.date} className="forecast-item">
                       <div className="forecast-date">
-                        {new Date(item.date).toLocaleDateString(undefined, {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
+                        {formatForecastDate(item.date)}
                       </div>
                       <div className="forecast-main">
                         <div className="forecast-description">

@@ -1,6 +1,8 @@
 export const STORAGE_LOCATION_KEY = 'weatherApp:location'
 export const STORAGE_SNAPSHOT_KEY = 'weatherApp:lastSnapshot'
 export const STORAGE_UNIT_KEY = 'weatherApp:unit'
+export const STORAGE_RECENT_LOCATIONS_KEY = 'weatherApp:recentLocations'
+export const RECENT_LOCATIONS_MAX = 10
 
 export const US_STATE_MAP: Record<string, string> = {
   AL: 'Alabama',
